@@ -651,6 +651,8 @@
                 }
 
                 const data = await response.json();
+                console.log('[DEBUG] Response received:', data);
+                console.log('[DEBUG] Response keys:', Object.keys(data));
 
                 if (data.error) {
                     // Display detailed error message
@@ -675,7 +677,13 @@
                     return;
                 }
 
-                displayResults(data);
+                try {
+                    displayResults(data);
+                } catch (displayError) {
+                    console.error('[ERROR] displayResults failed:', displayError);
+                    alert('Error displaying results: ' + displayError.message + '. Check console for details.');
+                    throw displayError; // Re-throw to trigger catch block
+                }
             } catch (error) {
                 clearTimeout(timeoutId);
                 let errorMsg = 'Evaluation failed: ';
@@ -688,42 +696,76 @@
                     errorMsg += error.message;
                 }
                 
+                console.error('[ERROR] Evaluation error:', error);
+                console.error('[ERROR] Error stack:', error.stack);
                 alert(errorMsg);
-                console.error('Evaluation error:', error);
             } finally {
-                document.getElementById('loadingOverlay').classList.remove('active');
+                // Always remove loading overlay, even on error
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.remove('active');
+                    console.log('[DEBUG] Loading overlay removed');
+                }
             }
         });
 
         function displayResults(data) {
+            console.log('[DEBUG] displayResults called with:', data);
+            
+            if (!data || !data.overall) {
+                throw new Error('Invalid response data: missing overall metrics');
+            }
+            
             const results = data.overall;
             
-            // Update metric cards
-            updateMetric('f1Micro', results.f1_micro, 'f1MicroLabel');
-            updateMetric('precision', results.precision_micro);
-            updateMetric('recall', results.recall_micro);
-            updateMetric('exactMatch', results.exact_match_ratio, null, true);
-            updateMetric('f1Macro', results.f1_macro);
-            updateMetric('jaccard', results.jaccard_mean);
-            document.getElementById('nResponses').textContent = results.n_responses.toLocaleString();
+            try {
+                // Update metric cards
+                if (results.f1_micro !== undefined) updateMetric('f1Micro', results.f1_micro, 'f1MicroLabel');
+                if (results.precision_micro !== undefined) updateMetric('precision', results.precision_micro);
+                if (results.recall_micro !== undefined) updateMetric('recall', results.recall_micro);
+                if (results.exact_match_ratio !== undefined) updateMetric('exactMatch', results.exact_match_ratio, null, true);
+                if (results.f1_macro !== undefined) updateMetric('f1Macro', results.f1_macro);
+                if (results.jaccard_mean !== undefined) updateMetric('jaccard', results.jaccard_mean);
+                if (results.n_responses !== undefined) {
+                    document.getElementById('nResponses').textContent = results.n_responses.toLocaleString();
+                }
 
-            // Display top/bottom codes
-            displayCodeList('topCodes', data.top_codes);
-            displayCodeList('bottomCodes', data.bottom_codes);
+                // Display top/bottom codes
+                if (data.top_codes && Array.isArray(data.top_codes)) {
+                    displayCodeList('topCodes', data.top_codes);
+                }
+                if (data.bottom_codes && Array.isArray(data.bottom_codes)) {
+                    displayCodeList('bottomCodes', data.bottom_codes);
+                }
 
-            // Display worst mismatches
-            if (data.worst_mismatches && data.worst_mismatches.length > 0) {
-                displayMismatches(data.worst_mismatches, results.n_mismatches);
-                document.getElementById('mismatchSection').style.display = 'block';
+                // Display worst mismatches
+                if (data.worst_mismatches && Array.isArray(data.worst_mismatches) && data.worst_mismatches.length > 0) {
+                    displayMismatches(data.worst_mismatches, results.n_mismatches || 0);
+                    document.getElementById('mismatchSection').style.display = 'block';
+                }
+
+                // Create charts (wrap in try-catch in case Chart.js fails)
+                try {
+                    createMetricsChart(results);
+                } catch (chartError) {
+                    console.error('[ERROR] Metrics chart creation failed:', chartError);
+                }
+                
+                try {
+                    createConfusionChart(results);
+                } catch (chartError) {
+                    console.error('[ERROR] Confusion chart creation failed:', chartError);
+                }
+
+                // Show results section
+                document.getElementById('resultsSection').style.display = 'block';
+                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                console.log('[DEBUG] displayResults completed successfully');
+            } catch (error) {
+                console.error('[ERROR] Error in displayResults:', error);
+                throw error;
             }
-
-            // Create charts
-            createMetricsChart(results);
-            createConfusionChart(results);
-
-            // Show results section
-            document.getElementById('resultsSection').style.display = 'block';
-            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function updateMetric(elementId, value, labelId = null, isPercentage = false) {

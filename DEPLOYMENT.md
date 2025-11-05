@@ -23,8 +23,15 @@
      ```
    - **Start Command**: 
      ```bash
-     python -m gunicorn app:app --bind 0.0.0.0:$PORT
+     python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --keep-alive 5 --max-requests 1000
      ```
+     
+     **Why these settings?**
+     - `--workers 1`: Free tier has limited RAM (512MB)
+     - `--threads 4`: Handle multiple requests concurrently
+     - `--timeout 120`: 2 minutes for large file processing
+     - `--keep-alive 5`: Maintain connections
+     - `--max-requests 1000`: Restart worker after 1000 requests (memory leak prevention)
 
 3. **Environment Variables** (IMPORTANT)
    - Go to **Environment** tab

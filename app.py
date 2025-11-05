@@ -188,7 +188,8 @@ def evaluate():
             depth_stats[depth]['avg_f1'] /= depth_stats[depth]['count']
         
         # Get worst mismatches (top 50 with most errors)
-        mismatches = evaluator.metrics.get('mismatches', [])[:50]
+        # Limit to top 20 for initial display to reduce response size
+        mismatches = evaluator.metrics.get('mismatches', [])[:20]
         
         # Load verbatims from benchmark - keyed by (respondent_id, question_id)
         import xml.etree.ElementTree as ET
@@ -263,7 +264,16 @@ def evaluate():
         # Clean up uploaded file
         upload_path.unlink(missing_ok=True)
         
-        return jsonify(response_data)
+        # Create response with explicit headers to prevent buffering issues
+        response = jsonify(response_data)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.headers['Content-Length'] = str(len(response.get_data()))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        
+        print(f"[RESPONSE] Sending response with {len(response.get_data())} bytes")
+        print(f"[RESPONSE] Response keys: {list(response_data.keys())}")
+        
+        return response
         
     except Exception as e:
         import traceback
