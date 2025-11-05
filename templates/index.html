@@ -620,17 +620,35 @@
         document.getElementById('evaluateBtn').addEventListener('click', async () => {
             if (!selectedFile || !selectedBenchmark) return;
 
+            // Check file size (16MB limit for Render free tier)
+            const maxSize = 16 * 1024 * 1024; // 16MB
+            if (selectedFile.size > maxSize) {
+                alert(`File too large! Maximum size is 16MB. Your file is ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB.`);
+                return;
+            }
+
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('benchmark', selectedBenchmark);
 
             document.getElementById('loadingOverlay').classList.add('active');
 
+            // Add timeout controller (2 minutes for large files)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds
+
             try {
                 const response = await fetch('/api/evaluate', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
 
                 const data = await response.json();
 
@@ -659,7 +677,19 @@
 
                 displayResults(data);
             } catch (error) {
-                alert('Evaluation failed: ' + error.message);
+                clearTimeout(timeoutId);
+                let errorMsg = 'Evaluation failed: ';
+                
+                if (error.name === 'AbortError') {
+                    errorMsg = 'Request timeout! The evaluation took too long (>2 minutes). Try with a smaller file or simpler benchmark.';
+                } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+                    errorMsg = 'Network error! Check if the server is running and try again.';
+                } else {
+                    errorMsg += error.message;
+                }
+                
+                alert(errorMsg);
+                console.error('Evaluation error:', error);
             } finally {
                 document.getElementById('loadingOverlay').classList.remove('active');
             }

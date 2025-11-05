@@ -17,12 +17,17 @@ import os
 from evaluate_model import CodebookEvaluator
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size (reduced for Render free tier)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Create uploads directory
-Path('uploads').mkdir(exist_ok=True)
+# Create uploads directory if possible (may fail on read-only filesystem)
+try:
+    Path('uploads').mkdir(exist_ok=True)
+except (PermissionError, OSError):
+    # On Render, use /tmp which is writable
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+    Path('/tmp/uploads').mkdir(exist_ok=True)
 
 # Available benchmarks
 BENCHMARKS = {
@@ -99,9 +104,15 @@ def evaluate():
         if not Path(benchmark_path).exists():
             return jsonify({'error': f'Benchmark file not found: {benchmark_path}'}), 404
         
+        # Log for debugging
+        print(f"[UPLOAD] Receiving file: {file.filename} for benchmark: {benchmark_id}")
+        print(f"[UPLOAD] Upload folder: {app.config['UPLOAD_FOLDER']}")
+        
         # Save uploaded file temporarily
-        upload_path = Path('uploads') / file.filename
+        upload_folder = Path(app.config['UPLOAD_FOLDER'])
+        upload_path = upload_folder / file.filename
         file.save(str(upload_path))
+        print(f"[UPLOAD] File saved to: {upload_path}")
         
         # Run evaluation
         try:
@@ -179,21 +190,29 @@ def evaluate():
         # Get worst mismatches (top 50 with most errors)
         mismatches = evaluator.metrics.get('mismatches', [])[:50]
         
-        # Load verbatims from benchmark
+        # Load verbatims from benchmark - keyed by (respondent_id, question_id)
         import xml.etree.ElementTree as ET
         verbatims = {}
         benchmark_tree = ET.parse(benchmark_path)
         benchmark_root = benchmark_tree.getroot()
         
-        for response in benchmark_root.findall('.//Response'):
-            respondent = response.find('DRORespondent')
-            verbatim = response.find('DROVerbatim')
-            if respondent is not None and verbatim is not None:
-                verbatims[respondent.text] = verbatim.text or ""
+        for question in benchmark_root.findall('.//Question'):
+            question_id_elem = question.find('QuestionID')
+            if question_id_elem is None:
+                continue
+            question_id = question_id_elem.text
+            
+            for response in question.findall('.//Response'):
+                respondent = response.find('DRORespondent')
+                verbatim = response.find('DROVerbatim')
+                if respondent is not None and verbatim is not None:
+                    key = (respondent.text, question_id)
+                    verbatims[key] = verbatim.text or ""
         
         # Enrich mismatches with code descriptions and verbatim text
         for mismatch in mismatches:
-            mismatch['verbatim'] = verbatims.get(mismatch['respondent_id'], 'N/A')
+            key = (mismatch['respondent_id'], mismatch['question_id'])
+            mismatch['verbatim'] = verbatims.get(key, 'N/A')
             mismatch['missed_descriptions'] = [
                 evaluator.codebook.get(code, {}).get('description', 'Unknown')
                 for code in mismatch['missed_codes']
@@ -238,7 +257,8 @@ def evaluate():
         session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
         session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
                                for k, v in evaluator.codebook.items()}
-        session['verbatims'] = verbatims
+        # Convert verbatims dict keys (tuples) to strings for session storage
+        session['verbatims'] = {f"{k[0]}||{k[1]}": v for k, v in verbatims.items()}
         
         # Clean up uploaded file
         upload_path.unlink(missing_ok=True)
@@ -264,7 +284,9 @@ def download_mismatches():
         mismatches = session['all_mismatches']
         benchmark_name = session.get('benchmark_name', 'Benchmark')
         codebook = session.get('codebook', {})
-        verbatims = session.get('verbatims', {})
+        # Convert verbatims keys from strings back to tuples
+        verbatims_str = session.get('verbatims', {})
+        verbatims = {tuple(k.split('||')): v for k, v in verbatims_str.items()}
         
         # Create CSV in memory
         output = io.StringIO()
@@ -290,7 +312,9 @@ def download_mismatches():
         # Data rows
         for rank, mismatch in enumerate(mismatches, 1):
             respondent_id = mismatch['respondent_id']
-            verbatim = verbatims.get(respondent_id, 'N/A')
+            question_id = mismatch['question_id']
+            key = (respondent_id, question_id)
+            verbatim = verbatims.get(key, 'N/A')
             
             # Get code descriptions
             missed_descs = [
