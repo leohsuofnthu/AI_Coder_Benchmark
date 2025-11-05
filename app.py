@@ -8,7 +8,7 @@ Usage:
 Then open: http://localhost:5000
 """
 
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, make_response
 from pathlib import Path
 import json
 import csv
@@ -20,6 +20,14 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size (reduced for Render free tier)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Session configuration for Render
+# Use signed cookies (default) - works on Render free tier
+# Note: Sessions are ephemeral on Render free tier (lost on restart)
+# But CSV download happens immediately after evaluation, so this is fine
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Create uploads directory if possible (may fail on read-only filesystem)
 try:
@@ -187,9 +195,8 @@ def evaluate():
         for depth in depth_stats:
             depth_stats[depth]['avg_f1'] /= depth_stats[depth]['count']
         
-        # Get worst mismatches (top 50 with most errors)
-        # Limit to top 20 for initial display to reduce response size
-        mismatches = evaluator.metrics.get('mismatches', [])[:20]
+        # Get all mismatches (for CSV download only, not for display)
+        all_mismatches = evaluator.metrics.get('mismatches', [])
         
         # Load verbatims from benchmark - keyed by (respondent_id, question_id)
         import xml.etree.ElementTree as ET
@@ -210,19 +217,7 @@ def evaluate():
                     key = (respondent.text, question_id)
                     verbatims[key] = verbatim.text or ""
         
-        # Enrich mismatches with code descriptions and verbatim text
-        for mismatch in mismatches:
-            key = (mismatch['respondent_id'], mismatch['question_id'])
-            mismatch['verbatim'] = verbatims.get(key, 'N/A')
-            mismatch['missed_descriptions'] = [
-                evaluator.codebook.get(code, {}).get('description', 'Unknown')
-                for code in mismatch['missed_codes']
-            ]
-            mismatch['extra_descriptions'] = [
-                evaluator.codebook.get(code, {}).get('description', 'Unknown')
-                for code in mismatch['extra_codes']
-            ]
-        
+        # Return minimal data first (core metrics only)
         response_data = {
             'success': True,
             'benchmark': {
@@ -249,29 +244,57 @@ def evaluate():
             'top_codes': code_performance[:10],
             'bottom_codes': sorted(code_performance, key=lambda x: x['f1'])[:10],
             'depth_stats': depth_stats,
-            'all_codes': code_performance,
-            'worst_mismatches': mismatches
+            # Only include summary - no detailed mismatches
+            'has_mismatches': len(all_mismatches) > 0,
+            'mismatch_count': len(all_mismatches)
         }
         
-        # Store all mismatches in session for CSV download
-        session['all_mismatches'] = evaluator.metrics.get('mismatches', [])
+        # Clean up uploaded file first (before session storage)
+        upload_path.unlink(missing_ok=True)
+        
+        # Store mismatches in session for CSV download only
+        # Enrich mismatches with verbatims before storing
+        mismatch_keys = {(m['respondent_id'], m['question_id']) for m in all_mismatches}
+        for mismatch in all_mismatches:
+            key = (mismatch['respondent_id'], mismatch['question_id'])
+            mismatch['verbatim'] = verbatims.get(key, 'N/A')
+            mismatch['missed_descriptions'] = [
+                evaluator.codebook.get(code, {}).get('description', 'Unknown')
+                for code in mismatch['missed_codes']
+            ]
+            mismatch['extra_descriptions'] = [
+                evaluator.codebook.get(code, {}).get('description', 'Unknown')
+                for code in mismatch['extra_codes']
+            ]
+        
+        session['all_mismatches'] = all_mismatches
         session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
         session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
                                for k, v in evaluator.codebook.items()}
-        # Convert verbatims dict keys (tuples) to strings for session storage
-        session['verbatims'] = {f"{k[0]}||{k[1]}": v for k, v in verbatims.items()}
         
-        # Clean up uploaded file
-        upload_path.unlink(missing_ok=True)
+        # Calculate response size before creating JSON
+        response_json = json.dumps(response_data)
+        response_size = len(response_json.encode('utf-8'))
         
-        # Create response with explicit headers to prevent buffering issues
-        response = jsonify(response_data)
+        print(f"[RESPONSE] Preparing response...")
+        print(f"[RESPONSE] Response size: {response_size} bytes ({response_size/1024:.1f} KB)")
+        print(f"[RESPONSE] Mismatches stored in session: {len(all_mismatches)}")
+        print(f"[RESPONSE] Session keys: {list(session.keys())}")
+        
+        # Create response with explicit headers for Render compatibility
+        response = make_response(response_json)
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
-        response.headers['Content-Length'] = str(len(response.get_data()))
+        response.headers['Content-Length'] = str(response_size)
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['X-Content-Size'] = str(response_size)  # Debug header
+        response.status_code = 200
         
-        print(f"[RESPONSE] Sending response with {len(response.get_data())} bytes")
-        print(f"[RESPONSE] Response keys: {list(response_data.keys())}")
+        print(f"[RESPONSE] Response created, sending...")
+        
+        # Force flush for Render logging
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
         
         return response
         
@@ -289,14 +312,18 @@ def download_mismatches():
     try:
         # Get data from session
         if 'all_mismatches' not in session:
+            print("[CSV] No session data found")
             return jsonify({'error': 'No evaluation data found. Please run evaluation first.'}), 400
         
-        mismatches = session['all_mismatches']
+        mismatches = session.get('all_mismatches', [])
         benchmark_name = session.get('benchmark_name', 'Benchmark')
         codebook = session.get('codebook', {})
-        # Convert verbatims keys from strings back to tuples
-        verbatims_str = session.get('verbatims', {})
-        verbatims = {tuple(k.split('||')): v for k, v in verbatims_str.items()}
+        
+        if not mismatches:
+            print("[CSV] Mismatches list is empty")
+            return jsonify({'error': 'No mismatches found in evaluation data.'}), 400
+        
+        print(f"[CSV] Generating CSV for {len(mismatches)} mismatches")
         
         # Create CSV in memory
         output = io.StringIO()
@@ -323,18 +350,17 @@ def download_mismatches():
         for rank, mismatch in enumerate(mismatches, 1):
             respondent_id = mismatch['respondent_id']
             question_id = mismatch['question_id']
-            key = (respondent_id, question_id)
-            verbatim = verbatims.get(key, 'N/A')
+            verbatim = mismatch.get('verbatim', 'N/A')
             
-            # Get code descriptions
-            missed_descs = [
+            # Get code descriptions (use pre-stored or fallback)
+            missed_descs = mismatch.get('missed_descriptions', [
                 codebook.get(code, {}).get('description', 'Unknown')
                 for code in mismatch['missed_codes']
-            ]
-            extra_descs = [
+            ])
+            extra_descs = mismatch.get('extra_descriptions', [
                 codebook.get(code, {}).get('description', 'Unknown')
                 for code in mismatch['extra_codes']
-            ]
+            ])
             
             correct_codes = set(mismatch['predicted']) & set(mismatch['ground_truth'])
             
@@ -356,20 +382,38 @@ def download_mismatches():
         
         # Prepare file for download
         output.seek(0)
+        csv_content = output.getvalue()
+        csv_bytes = csv_content.encode('utf-8-sig')  # UTF-8 with BOM for Excel compatibility
         filename = f"{benchmark_name.replace(' ', '_')}_mismatches.csv"
         
-        return send_file(
-            io.BytesIO(output.getvalue().encode('utf-8-sig')),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=filename
-        )
+        print(f"[CSV] CSV generated: {len(csv_bytes)} bytes, {len(mismatches)} rows")
+        
+        # Create response with proper headers for Render
+        response = make_response(csv_bytes)
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.headers['Content-Length'] = str(len(csv_bytes))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        
+        print(f"[CSV] Response created, sending file...")
+        
+        return response
         
     except Exception as e:
         import traceback
         print(f"Download error: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/test')
+def test_endpoint():
+    """Test endpoint to verify server can send responses."""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Server is responding',
+        'timestamp': __import__('datetime').datetime.now().isoformat()
+    })
 
 
 @app.route('/api/analyze/<benchmark_id>')

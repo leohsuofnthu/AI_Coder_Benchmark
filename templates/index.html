@@ -535,20 +535,23 @@
                 </div>
             </div>
 
-            <!-- Worst Mismatches -->
+            <!-- Mismatch Download Section -->
             <div class="row g-4 mb-4" id="mismatchSection" style="display: none;">
                 <div class="col-12">
                     <div class="code-table" style="max-height: none;">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">
+                        <div class="text-center py-4">
+                            <h4 class="mb-3">
                                 <i class="fas fa-exclamation-circle me-2" style="color: #f59e0b;"></i>
-                                <span id="mismatchTitle">Worst Mismatched Responses</span>
+                                <span id="mismatchTitle">Mismatched Responses Found</span>
                             </h4>
-                            <button class="btn btn-sm btn-primary" id="downloadCsvBtn">
-                                <i class="fas fa-download me-2"></i>Download ALL as CSV
+                            <div id="worstMismatches" class="mb-4"></div>
+                            <button class="btn btn-lg btn-primary" id="downloadCsvBtn" style="min-width: 250px;">
+                                <i class="fas fa-download me-2"></i>Download Complete Mismatch Report (CSV)
                             </button>
+                            <p class="text-muted small mt-3 mb-0">
+                                Includes all mismatched responses with verbatim text, missed codes, and extra codes
+                            </p>
                         </div>
-                        <div id="worstMismatches" style="max-height: 800px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>
@@ -638,6 +641,7 @@
             const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds
 
             try {
+                console.log('[DEBUG] Starting fetch request...');
                 const response = await fetch('/api/evaluate', {
                     method: 'POST',
                     body: formData,
@@ -645,14 +649,24 @@
                 });
 
                 clearTimeout(timeoutId);
+                console.log('[DEBUG] Response received, status:', response.status);
+                console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                // Check content size from header
+                const contentSize = response.headers.get('X-Content-Size') || response.headers.get('Content-Length');
+                if (contentSize) {
+                    console.log('[DEBUG] Response size:', contentSize, 'bytes');
+                }
 
                 if (!response.ok) {
                     throw new Error(`Server error: ${response.status} ${response.statusText}`);
                 }
 
+                console.log('[DEBUG] Starting JSON parse...');
                 const data = await response.json();
-                console.log('[DEBUG] Response received:', data);
+                console.log('[DEBUG] JSON parse complete');
                 console.log('[DEBUG] Response keys:', Object.keys(data));
+                console.log('[DEBUG] Response size:', JSON.stringify(data).length, 'bytes');
 
                 if (data.error) {
                     // Display detailed error message
@@ -738,10 +752,19 @@
                     displayCodeList('bottomCodes', data.bottom_codes);
                 }
 
-                // Display worst mismatches
-                if (data.worst_mismatches && Array.isArray(data.worst_mismatches) && data.worst_mismatches.length > 0) {
-                    displayMismatches(data.worst_mismatches, results.n_mismatches || 0);
+                // Show download button if there are mismatches
+                if (data.has_mismatches && data.mismatch_count > 0) {
                     document.getElementById('mismatchSection').style.display = 'block';
+                    document.getElementById('mismatchTitle').textContent = `Found ${data.mismatch_count} Mismatched Responses`;
+                    document.getElementById('worstMismatches').innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>${data.mismatch_count}</strong> mismatched responses found.
+                            Click the button below to download the complete mismatch report with verbatim text and code details.
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('mismatchSection').style.display = 'none';
                 }
 
                 // Create charts (wrap in try-catch in case Chart.js fails)
@@ -895,27 +918,59 @@
 
         // CSV Download Handler
         document.getElementById('downloadCsvBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('downloadCsvBtn');
+            const originalText = btn.innerHTML;
+            
             try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating CSV...';
+                
+                console.log('[CSV] Starting download...');
                 const response = await fetch('/api/download-mismatches');
                 
+                console.log('[CSV] Response status:', response.status);
+                
                 if (!response.ok) {
-                    const data = await response.json();
-                    alert('Download error: ' + (data.error || 'Unknown error'));
+                    // Try to get error message
+                    let errorMsg = 'Download failed';
+                    try {
+                        const data = await response.json();
+                        errorMsg = data.error || errorMsg;
+                    } catch (e) {
+                        errorMsg = `Server error: ${response.status} ${response.statusText}`;
+                    }
+                    alert('Download error: ' + errorMsg);
                     return;
                 }
                 
-                // Get filename from header
+                // Get filename from Content-Disposition header or use default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'mismatches.csv';
+                if (contentDisposition) {
+                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                console.log('[CSV] Downloading file:', filename);
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'mismatches.csv';
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
+                
+                console.log('[CSV] Download complete');
             } catch (error) {
-                alert('Download failed: ' + error.message);
+                console.error('[CSV] Download error:', error);
+                alert('Download failed: ' + error.message + '. Please try again or check the browser console.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         });
 
