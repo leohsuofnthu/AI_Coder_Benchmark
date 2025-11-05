@@ -15,13 +15,15 @@
 2. **Configure Settings**
    - **Name**: `ai-coder-evaluation` (or your choice)
    - **Environment**: `Python 3`
+   - **Region**: Choose closest to your users
+   - **Branch**: `main` (or your branch name)
    - **Build Command**: 
      ```bash
-     pip install -r requirements.txt
+     pip install --upgrade pip && pip install -r requirements.txt
      ```
    - **Start Command**: 
      ```bash
-     gunicorn app:app
+     python -m gunicorn app:app --bind 0.0.0.0:$PORT
      ```
 
 3. **Environment Variables** (IMPORTANT)
@@ -78,17 +80,34 @@ python app.py
 
 ## Troubleshooting
 
+**"gunicorn: command not found" error?**
+- ✅ **Solution 1** (Recommended): Update Start Command to:
+  ```bash
+  python -m gunicorn app:app --bind 0.0.0.0:$PORT
+  ```
+- ✅ **Solution 2** (Alternative): Use Flask's built-in server:
+  ```bash
+  python app.py
+  ```
+  ⚠️ Note: Flask server works but gunicorn is better for production
+- Check that Build Command completed successfully in logs
+- Verify `gunicorn>=21.2.0` is in `requirements.txt`
+
 **Build fails?**
-- Check Python version (3.7+ required)
+- Check Python version (3.7+ required, 3.11 recommended)
 - Verify `requirements.txt` exists
+- Check build logs for specific errors
+- Try: `pip install --upgrade pip && pip install -r requirements.txt`
 
 **App crashes on start?**
 - Check logs: `Render Dashboard → Logs`
-- Verify `SECRET_KEY` is set
+- Verify `SECRET_KEY` is set in Environment Variables
+- Ensure port binding is correct: `--bind 0.0.0.0:$PORT`
 
 **CSV download doesn't work?**
 - Must run evaluation first
 - Check browser console for errors
+- Verify session is working (SECRET_KEY set)
 
 ---
 

@@ -389,12 +389,16 @@ def analyze_benchmark(benchmark_id):
 
 
 if __name__ == '__main__':
+    # Get port from environment variable (for Render/Heroku) or use 5000
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    
     print("\n" + "="*70)
     print("🚀 AI Coder Evaluation Web App")
     print("="*70)
     print("\n📡 Server starting...")
-    print("🌐 Open in browser: http://localhost:5000")
+    print(f"🌐 Open in browser: http://localhost:{port}")
     print("💡 Press Ctrl+C to stop\n")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
 
