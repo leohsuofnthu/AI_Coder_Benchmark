@@ -207,14 +207,42 @@ class CodebookEvaluator:
                 )
         
         if mismatches:
-            # Show first 3 mismatches
+            # Categorize mismatches by type
+            hierarchy_mismatches = [m for m in mismatches if 'Hierarchy depth' in m]
+            description_mismatches = [m for m in mismatches if 'Description mismatch' in m]
+            net_mismatches = [m for m in mismatches if 'Net code flag' in m]
+            
+            # Build error message with categorization
+            error_parts = []
+            if hierarchy_mismatches:
+                error_parts.append(f"   • Hierarchy Depth Mismatch: {len(hierarchy_mismatches)} code(s) have different hierarchy levels")
+                error_parts.append(f"     Examples:")
+                for m in hierarchy_mismatches[:2]:
+                    # Extract first line (code key and issue)
+                    first_line = m.split('\n')[0] if '\n' in m else m
+                    error_parts.append(f"       {first_line}")
+            
+            if description_mismatches:
+                error_parts.append(f"   • Description Mismatch: {len(description_mismatches)} code(s) have different descriptions")
+                if description_mismatches:
+                    first_line = description_mismatches[0].split('\n')[0] if '\n' in description_mismatches[0] else description_mismatches[0]
+                    error_parts.append(f"     Example: {first_line}")
+            
+            if net_mismatches:
+                error_parts.append(f"   • Net Flag Mismatch: {len(net_mismatches)} code(s) have different net flags")
+            
+            # Show first 3 total mismatches for details
             error_details = "\n   ".join(mismatches[:3])
             more_text = f"\n   ... and {len(mismatches) - 3} more mismatches" if len(mismatches) > 3 else ""
+            
+            error_summary = "\n".join(error_parts)
+            
             raise ValueError(
-                f"❌ Codebook architecture mismatch: {len(mismatches)} code(s) have different properties!\n\n"
-                f"   {error_details}{more_text}\n\n"
-                f"   The codebook must be identical to the benchmark.\n"
-                f"   Copy the entire <CodeBooks> section from the benchmark XML."
+                f"❌ Codebook Architecture Mismatch: {len(mismatches)} code(s) have different properties!\n\n"
+                f"{error_summary}\n\n"
+                f"   Detailed mismatches:\n   {error_details}{more_text}\n\n"
+                f"   The codebook hierarchy and structure must be identical to the benchmark.\n"
+                f"   Copy the entire <CodeBooks> section from the benchmark XML to your model output."
             )
         
         print("✓ Codebook validation passed - architectures match!")

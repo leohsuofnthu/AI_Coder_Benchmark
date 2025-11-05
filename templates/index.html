@@ -426,6 +426,38 @@
             background: var(--primary-color);
         }
         
+        /* Error Container */
+        .error-container {
+            animation: fadeInUp 0.4s ease;
+            background: var(--card-bg);
+            border: 2px solid #ef4444;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .error-container .error-icon {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .error-message pre {
+            background: rgba(239, 68, 68, 0.1);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 3px solid #ef4444;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0.5rem 0;
+        }
+        
         /* Download Card */
         .download-card {
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
@@ -958,36 +990,37 @@
                     console.log('[DEBUG] Response size:', contentSize, 'bytes');
                 }
 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
-                }
-
                 console.log('[DEBUG] Starting JSON parse...');
-                const data = await response.json();
+                let data;
+                
+                // Try to parse JSON response
+                try {
+                    const responseText = await response.text();
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    // If JSON parse fails, response might be HTML or plain text
+                    if (!response.ok) {
+                        showPageError(
+                            `Server Error: ${response.status} ${response.statusText}`,
+                            'The server returned an error. Please check your file and try again.',
+                            'Verify your XML file matches the benchmark format and try again.'
+                        );
+                        return;
+                    }
+                    throw parseError;
+                }
+                
                 console.log('[DEBUG] JSON parse complete');
                 console.log('[DEBUG] Response keys:', Object.keys(data));
                 console.log('[DEBUG] Response size:', JSON.stringify(data).length, 'bytes');
 
-                if (data.error) {
-                    // Display detailed error message
-                    let errorHtml = '<div class="alert alert-danger alert-custom" role="alert">';
-                    errorHtml += '<h4 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>' + data.error + '</h4>';
-                    
-                    if (data.message) {
-                        errorHtml += '<hr><pre style="white-space: pre-wrap; font-size: 0.9rem;">' + data.message + '</pre>';
-                    }
-                    
-                    if (data.suggestion) {
-                        errorHtml += '<hr><p class="mb-0"><strong><i class="fas fa-lightbulb me-2"></i>Suggestion:</strong> ' + data.suggestion + '</p>';
-                    }
-                    
-                    errorHtml += '</div>';
-                    
-                    // Insert error message before results section
-                    const resultsSection = document.getElementById('resultsSection');
-                    resultsSection.innerHTML = errorHtml;
-                    resultsSection.style.display = 'block';
-                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (!response.ok || data.error) {
+                    // Display detailed error message on page
+                    showPageError(
+                        data.error || `Server Error: ${response.status} ${response.statusText}`,
+                        data.message || 'An error occurred during evaluation.',
+                        data.suggestion || 'Please check your file format and try again.'
+                    );
                     return;
                 }
 
@@ -995,24 +1028,34 @@
                     displayResults(data);
                 } catch (displayError) {
                     console.error('[ERROR] displayResults failed:', displayError);
-                    alert('Error displaying results: ' + displayError.message + '. Check console for details.');
+                    showPageError(
+                        'Display Error',
+                        displayError.message,
+                        'Check browser console for details. The data may be corrupted or incomplete.'
+                    );
                     throw displayError; // Re-throw to trigger catch block
                 }
             } catch (error) {
                 clearTimeout(timeoutId);
-                let errorMsg = 'Evaluation failed: ';
+                let errorTitle = 'Evaluation Failed';
+                let errorMsg = '';
+                let suggestion = '';
                 
                 if (error.name === 'AbortError') {
-                    errorMsg = 'Request timeout! The evaluation took too long (>2 minutes). Try with a smaller file or simpler benchmark.';
+                    errorMsg = 'Request timeout! The evaluation took too long (>2 minutes).';
+                    suggestion = 'Try with a smaller file or simpler benchmark.';
                 } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-                    errorMsg = 'Network error! Check if the server is running and try again.';
+                    errorMsg = 'Network error! Unable to connect to the server.';
+                    suggestion = 'Check if the server is running and try again.';
                 } else {
-                    errorMsg += error.message;
+                    errorMsg = error.message || 'An unexpected error occurred.';
+                    suggestion = 'Please check your file format and try again.';
                 }
                 
                 console.error('[ERROR] Evaluation error:', error);
                 console.error('[ERROR] Error stack:', error.stack);
-                alert(errorMsg);
+                
+                showPageError(errorTitle, errorMsg, suggestion);
             } finally {
                 // Always remove loading overlay, even on error
                 const loadingOverlay = document.getElementById('loadingOverlay');
@@ -1022,6 +1065,46 @@
                 }
             }
         });
+
+        // Function to display errors on the page instead of alert dialogs
+        function showPageError(title, message, suggestion = '') {
+            const resultsSection = document.getElementById('resultsSection');
+            
+            // Build error HTML with better styling
+            let errorHtml = `
+                <div class="error-container" style="background: var(--card-bg); border: 2px solid #ef4444; border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem;">
+                    <div class="d-flex align-items-start mb-3">
+                        <div class="error-icon me-3" style="font-size: 2rem; color: #ef4444;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <h3 class="mb-2" style="color: #ef4444; font-weight: 600;">
+                                ${title}
+                            </h3>
+                            <div class="error-message" style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
+                                ${message.includes('\n') ? `<pre style="white-space: pre-wrap; font-size: 0.9rem; background: rgba(239, 68, 68, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #ef4444;">${message}</pre>` : message}
+                            </div>
+                            ${suggestion ? `
+                                <div class="error-suggestion" style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 1rem; border-radius: 0.25rem; margin-top: 1rem;">
+                                    <strong style="color: #fbbf24;"><i class="fas fa-lightbulb me-2"></i>Suggestion:</strong>
+                                    <div style="color: var(--text-secondary); margin-top: 0.5rem;">${suggestion}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button class="btn btn-primary" onclick="document.getElementById('resultsSection').style.display='none'; document.getElementById('resultsSection').innerHTML='';">
+                            <i class="fas fa-times me-2"></i>Dismiss
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            resultsSection.innerHTML = errorHtml;
+            resultsSection.style.display = 'block';
+            resultsSection.classList.add('active');
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
 
         function displayResults(data) {
             console.log('[DEBUG] displayResults called with:', data);
@@ -1277,9 +1360,12 @@
                         errorMsg = `Server error: ${response.status} ${response.statusText}`;
                     }
                     
-                    // Show detailed error in a better format
-                    const fullMsg = suggestion ? errorMsg + '\n\n💡 ' + suggestion : errorMsg;
-                    alert('Download Error\n\n' + fullMsg);
+                    // Show detailed error on page
+                    showPageError(
+                        'Download Error',
+                        errorMsg,
+                        suggestion || 'Please try again or check the browser console for details.'
+                    );
                     console.error('[CSV] Download error details:', { errorMsg, suggestion });
                     return;
                 }
@@ -1313,14 +1399,18 @@
                         statusDiv.style.display = 'none';
                     }, 3000);
                 }
-            } catch (error) {
-                console.error('[CSV] Download error:', error);
-                if (statusDiv) {
-                    statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1" style="color: var(--danger-color);"></i>Download failed';
-                    statusDiv.style.color = 'var(--danger-color)';
-                }
-                alert('Download failed: ' + error.message + '. Please try again or check the browser console.');
-            } finally {
+                } catch (error) {
+                    console.error('[CSV] Download error:', error);
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1" style="color: var(--danger-color);"></i>Download failed';
+                        statusDiv.style.color = 'var(--danger-color)';
+                    }
+                    showPageError(
+                        'Download Failed',
+                        error.message || 'An unexpected error occurred during download.',
+                        'Please try again or check the browser console for details.'
+                    );
+                } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
