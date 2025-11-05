@@ -9,6 +9,7 @@ Then open: http://localhost:5000
 """
 
 from flask import Flask, render_template, request, jsonify, send_file, session, make_response
+from flask_session import Session
 from pathlib import Path
 import json
 import csv
@@ -21,13 +22,46 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size (reduc
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Session configuration for Render
-# Use signed cookies (default) - works on Render free tier
-# Note: Sessions are ephemeral on Render free tier (lost on restart)
-# But CSV download happens immediately after evaluation, so this is fine
+# Robust server-side session configuration using Flask-Session
+# This solves the 4KB cookie size limit by storing sessions on the server filesystem
+# Works for both local development and production (Render)
+app.config['SESSION_TYPE'] = 'filesystem'  # Server-side session storage
+app.config['SESSION_PERMANENT'] = False  # Sessions expire when browser closes
+app.config['SESSION_USE_SIGNER'] = True  # Sign session cookies for security
+app.config['SESSION_KEY_PREFIX'] = 'ai_coder:'  # Prefix for session keys
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Determine session directory (works on both local and Render)
+# Render sets RENDER environment variable, also check for production mode
+# Use /tmp on Render (ephemeral but writable) or local directory for development
+if os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production':
+    # On Render, use /tmp which is writable (ephemeral but fine for short-lived sessions)
+    session_dir = '/tmp/flask_session'
+    print(f"[SESSION] Using Render filesystem backend: {session_dir}")
+else:
+    # Local development
+    session_dir = 'flask_session'
+    print(f"[SESSION] Using local filesystem backend: {session_dir}")
+
+app.config['SESSION_FILE_DIR'] = session_dir
+try:
+    Path(session_dir).mkdir(exist_ok=True, parents=True)
+    print(f"[SESSION] Session directory created/verified: {session_dir}")
+except Exception as e:
+    print(f"[SESSION] Warning: Could not create session directory {session_dir}: {e}")
+    # Fallback to /tmp if available
+    try:
+        session_dir = '/tmp/flask_session'
+        Path(session_dir).mkdir(exist_ok=True, parents=True)
+        app.config['SESSION_FILE_DIR'] = session_dir
+        print(f"[SESSION] Using fallback directory: {session_dir}")
+    except Exception as fallback_error:
+        print(f"[SESSION] Error: Could not create fallback directory: {fallback_error}")
+
+# Initialize Flask-Session
+Session(app)
 
 # Create uploads directory if possible (may fail on read-only filesystem)
 try:
@@ -267,10 +301,28 @@ def evaluate():
                 for code in mismatch['extra_codes']
             ]
         
-        session['all_mismatches'] = all_mismatches
-        session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
-        session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
-                               for k, v in evaluator.codebook.items()}
+        # Store in session (Flask-Session handles persistence automatically)
+        try:
+            session['all_mismatches'] = all_mismatches
+            session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
+            session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
+                                   for k, v in evaluator.codebook.items()}
+            
+            # Calculate and log session data size for debugging
+            session_data_size = len(json.dumps({
+                'all_mismatches': all_mismatches,
+                'benchmark_name': BENCHMARKS[benchmark_id]['name'],
+                'codebook': session['codebook']
+            }).encode('utf-8'))
+            
+            print(f"[SESSION] Stored {len(all_mismatches)} mismatches in session")
+            print(f"[SESSION] Session data size: {session_data_size:,} bytes ({session_data_size/1024:.1f} KB)")
+            print(f"[SESSION] Session keys after storage: {list(session.keys())}")
+            print(f"[SESSION] Using server-side session storage (no cookie size limits)")
+        except Exception as session_error:
+            print(f"[SESSION] Error storing session: {session_error}")
+            import traceback
+            print(traceback.format_exc())
         
         # Calculate response size before creating JSON
         response_json = json.dumps(response_data)
@@ -310,75 +362,101 @@ def evaluate():
 def download_mismatches():
     """Download mismatches as CSV file."""
     try:
+        print("[CSV] ===== CSV Download Request Received =====")
+        print(f"[CSV] Request method: {request.method}")
+        print(f"[CSV] Session keys: {list(session.keys())}")
+        print(f"[CSV] Using server-side session storage (Flask-Session filesystem backend)")
+        
         # Get data from session
         if 'all_mismatches' not in session:
-            print("[CSV] No session data found")
-            return jsonify({'error': 'No evaluation data found. Please run evaluation first.'}), 400
+            print("[CSV] ❌ No 'all_mismatches' key in session")
+            print("[CSV] Available session keys:", list(session.keys()))
+            return jsonify({
+                'error': 'No evaluation data found',
+                'message': 'The evaluation session has expired or no evaluation was run. Please run an evaluation first, then download the CSV immediately after.',
+                'suggestion': 'Run a new evaluation and download the CSV right away. Sessions may expire after inactivity.'
+            }), 400
         
         mismatches = session.get('all_mismatches', [])
         benchmark_name = session.get('benchmark_name', 'Benchmark')
         codebook = session.get('codebook', {})
         
+        print(f"[CSV] ✅ Found {len(mismatches)} mismatches in session")
+        print(f"[CSV] Benchmark name: {benchmark_name}")
+        print(f"[CSV] Codebook size: {len(codebook)} codes")
+        
         if not mismatches:
-            print("[CSV] Mismatches list is empty")
+            print("[CSV] ❌ Mismatches list is empty")
             return jsonify({'error': 'No mismatches found in evaluation data.'}), 400
         
-        print(f"[CSV] Generating CSV for {len(mismatches)} mismatches")
+        print(f"[CSV] 📝 Generating CSV for {len(mismatches)} mismatches")
         
         # Create CSV in memory
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # Header
+        # Header - Concise format
         writer.writerow([
             'Rank',
             'Respondent ID',
             'Question ID',
-            'Verbatim',
             'Error Count',
-            'Jaccard Score',
-            'Missed Codes (False Negatives)',
-            'Missed Descriptions',
-            'Extra Codes (False Positives)',
-            'Extra Descriptions',
-            'Correct Codes',
-            'Ground Truth (All)',
-            'Predicted (All)'
+            'Jaccard',
+            'Missed Codes',
+            'Extra Codes',
+            'Verbatim'
         ])
         
         # Data rows
+        print(f"[CSV] Writing {len(mismatches)} rows to CSV...")
+        rows_written = 0
         for rank, mismatch in enumerate(mismatches, 1):
-            respondent_id = mismatch['respondent_id']
-            question_id = mismatch['question_id']
-            verbatim = mismatch.get('verbatim', 'N/A')
-            
-            # Get code descriptions (use pre-stored or fallback)
-            missed_descs = mismatch.get('missed_descriptions', [
-                codebook.get(code, {}).get('description', 'Unknown')
-                for code in mismatch['missed_codes']
-            ])
-            extra_descs = mismatch.get('extra_descriptions', [
-                codebook.get(code, {}).get('description', 'Unknown')
-                for code in mismatch['extra_codes']
-            ])
-            
-            correct_codes = set(mismatch['predicted']) & set(mismatch['ground_truth'])
-            
-            writer.writerow([
-                rank,
-                respondent_id,
-                mismatch['question_id'],
-                verbatim,
-                mismatch['error_count'],
-                f"{mismatch['jaccard']:.3f}",
-                ', '.join(mismatch['missed_codes']),
-                ' | '.join(missed_descs),
-                ', '.join(mismatch['extra_codes']),
-                ' | '.join(extra_descs),
-                len(correct_codes),
-                ', '.join(mismatch['ground_truth']),
-                ', '.join(mismatch['predicted'])
-            ])
+            try:
+                respondent_id = mismatch.get('respondent_id', 'N/A')
+                question_id = mismatch.get('question_id', 'N/A')
+                verbatim = mismatch.get('verbatim', 'N/A')
+                
+                # Get code descriptions (use pre-stored or fallback)
+                missed_descs = mismatch.get('missed_descriptions', [
+                    codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch.get('missed_codes', [])
+                ])
+                extra_descs = mismatch.get('extra_descriptions', [
+                    codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch.get('extra_codes', [])
+                ])
+                
+                # Format codes with full descriptions - "CODE: Description"
+                missed_formatted = []
+                missed_codes_list = mismatch.get('missed_codes', [])
+                for i, code in enumerate(missed_codes_list):
+                    desc = missed_descs[i] if i < len(missed_descs) else 'Unknown'
+                    missed_formatted.append(f"{code}: {desc}")
+                
+                extra_formatted = []
+                extra_codes_list = mismatch.get('extra_codes', [])
+                for i, code in enumerate(extra_codes_list):
+                    desc = extra_descs[i] if i < len(extra_descs) else 'Unknown'
+                    extra_formatted.append(f"{code}: {desc}")
+                
+                writer.writerow([
+                    rank,
+                    respondent_id,
+                    question_id,
+                    mismatch.get('error_count', 0),
+                    f"{mismatch.get('jaccard', 0):.2f}",
+                    ' | '.join(missed_formatted) if missed_formatted else 'None',
+                    ' | '.join(extra_formatted) if extra_formatted else 'None',
+                    verbatim
+                ])
+                rows_written += 1
+            except Exception as row_error:
+                print(f"[CSV] ❌ Error writing row {rank}: {row_error}")
+                import traceback
+                print(traceback.format_exc())
+                continue
+        
+        print(f"[CSV] ✅ Wrote {rows_written} rows successfully")
         
         # Prepare file for download
         output.seek(0)
@@ -387,6 +465,8 @@ def download_mismatches():
         filename = f"{benchmark_name.replace(' ', '_')}_mismatches.csv"
         
         print(f"[CSV] CSV generated: {len(csv_bytes)} bytes, {len(mismatches)} rows")
+        print(f"[CSV] Filename: {filename}")
+        print(f"[CSV] CSV preview (first 200 chars): {csv_content[:200]}")
         
         # Create response with proper headers for Render
         response = make_response(csv_bytes)
@@ -394,8 +474,18 @@ def download_mismatches():
         response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         response.headers['Content-Length'] = str(len(csv_bytes))
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['X-Filename'] = filename  # Debug header
         
-        print(f"[CSV] Response created, sending file...")
+        print(f"[CSV] ✅ Response created with headers:")
+        print(f"[CSV]   Content-Type: {response.headers.get('Content-Type')}")
+        print(f"[CSV]   Content-Length: {response.headers.get('Content-Length')}")
+        print(f"[CSV]   Content-Disposition: {response.headers.get('Content-Disposition')}")
+        print(f"[CSV] 🚀 Sending file to client...")
+        
+        # Force flush
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
         
         return response
         

@@ -66,8 +66,30 @@ class CodebookEvaluator:
                     }
         
         # Parse Questions and Responses
+        # Only include open-ended questions (QuestionType = 0)
+        # QuestionType 0 = Open-ended text questions
+        # QuestionType 1+ = Closed-ended questions (multiple choice, etc.)
+        open_ended_count = 0
+        skipped_questions = []
+        skipped_count = 0
+        
         for question in root.findall('.//Question'):
+            question_type = self._get_text(question, 'QuestionType', '0')
             question_id = self._get_text(question, 'QuestionID')
+            
+            # Filter: Only process open-ended questions (QuestionType = 0)
+            if question_type != '0':
+                response_count = len(question.findall('.//Response'))
+                skipped_count += response_count
+                if question_id not in [q['id'] for q in skipped_questions]:
+                    skipped_questions.append({
+                        'id': question_id,
+                        'type': question_type,
+                        'count': response_count
+                    })
+                continue
+            
+            open_ended_count += 1
             
             for response in question.findall('.//Response'):
                 respondent_id = self._get_text(response, 'DRORespondent')
@@ -83,6 +105,16 @@ class CodebookEvaluator:
                 # Store with unique key
                 key = (respondent_id, question_id)
                 responses[key] = codes
+        
+        if skipped_count > 0:
+            print(f"  ⚠️  Filtered: {skipped_count} responses from {len(skipped_questions)} non-open-ended question(s) (QuestionType != 0)")
+            if len(skipped_questions) <= 5:
+                for q in skipped_questions:
+                    print(f"     - Question '{q['id']}': Type {q['type']}, {q['count']} responses skipped")
+        if open_ended_count > 0:
+            print(f"  ✓ Processing {open_ended_count} open-ended question(s) (QuestionType = 0)")
+        else:
+            print(f"  ⚠️  Warning: No open-ended questions (QuestionType = 0) found in XML!")
         
         print(f"  Found {len(codebook)} codes and {len(responses)} responses")
         return codebook, responses

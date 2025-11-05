@@ -43,6 +43,41 @@
             padding: 2rem;
         }
         
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .results-header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .section-title {
+                font-size: 1.125rem;
+            }
+            
+            .metric-value {
+                font-size: 2rem;
+            }
+            
+            .metric-icon-wrapper {
+                width: 48px;
+                height: 48px;
+            }
+            
+            .metric-icon-wrapper i {
+                font-size: 1.5rem !important;
+            }
+            
+            .download-card {
+                padding: 1.5rem;
+            }
+            
+            .chart-wrapper {
+                height: 250px;
+            }
+        }
+        
         .header {
             text-align: center;
             margin-bottom: 3rem;
@@ -183,41 +218,123 @@
             letter-spacing: -0.025em;
         }
         
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+        
+        .results-section.active {
+            display: block;
+            animation: fadeInUp 0.6s;
+        }
+        
+        .results-header {
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--card-border);
+        }
+        
+        .results-header h2 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Section Groups */
+        .section-group {
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--card-border);
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Metric Cards */
         .metric-card {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 0.75rem;
-            padding: 1.5rem;
-            transition: all 0.2s;
+            padding: 1.75rem 1.5rem;
+            transition: all 0.3s ease;
             height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
         
         .metric-card:hover {
-            transform: translateY(-2px);
+            transform: translateY(-4px);
             border-color: var(--primary-color);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
         }
         
-        .metric-card i {
-            opacity: 0.7;
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+        
+        .metric-card.metric-primary {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(34, 197, 94, 0.05) 100%);
+            border: 1.5px solid var(--card-border);
+        }
+        
+        .metric-card.metric-primary:hover {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(34, 197, 94, 0.08) 100%);
+        }
+        
+        .metric-icon-wrapper {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover .metric-icon-wrapper {
+            transform: scale(1.1);
+            background: rgba(59, 130, 246, 0.2);
         }
         
         .metric-value {
-            font-size: 2.25rem;
-            font-weight: 600;
-            margin: 0.5rem 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.75rem 0;
             letter-spacing: -0.025em;
+            line-height: 1.2;
         }
         
         .metric-label {
             color: var(--text-secondary);
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            font-weight: 500;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
         }
         
         .metric-card small {
             color: var(--text-muted);
+            font-size: 0.75rem;
         }
         
         .metric-excellent { color: var(--success-color); }
@@ -225,20 +342,34 @@
         .metric-fair { color: var(--warning-color); }
         .metric-poor { color: var(--danger-color); }
         
+        /* Chart Containers */
         .chart-container {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 0.75rem;
             padding: 2rem;
-            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        
+        .chart-container:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
         }
         
         .chart-container h4 {
             color: var(--text-primary);
-            font-weight: 500;
-            font-size: 1rem;
+            font-weight: 600;
+            font-size: 1.125rem;
         }
         
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+        
+        /* Code Tables */
         .code-table {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
@@ -246,16 +377,101 @@
             padding: 2rem;
             max-height: 500px;
             overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+        
+        .code-table:hover {
+            border-color: var(--primary-color);
         }
         
         .code-table h4 {
             color: var(--text-primary);
-            font-weight: 500;
-            font-size: 1rem;
+            font-weight: 600;
+            font-size: 1.125rem;
         }
         
         .code-table .border-bottom {
             border-color: var(--card-border) !important;
+        }
+        
+        .code-table.mismatch-details {
+            max-height: none;
+        }
+        
+        .mismatch-list {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+        
+        .mismatch-list::-webkit-scrollbar,
+        .code-table::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .mismatch-list::-webkit-scrollbar-track,
+        .code-table::-webkit-scrollbar-track {
+            background: var(--surface-bg);
+            border-radius: 4px;
+        }
+        
+        .mismatch-list::-webkit-scrollbar-thumb,
+        .code-table::-webkit-scrollbar-thumb {
+            background: var(--card-border);
+            border-radius: 4px;
+        }
+        
+        .mismatch-list::-webkit-scrollbar-thumb:hover,
+        .code-table::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+        
+        /* Download Card */
+        .download-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
+            border: 2px solid var(--primary-color);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.6s;
+        }
+        
+        .download-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(59, 130, 246, 0.2);
+            border-color: var(--success-color);
+        }
+        
+        .download-icon-wrapper {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--success-color), #16a34a);
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .download-card .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #16a34a 100%);
+            border: none;
+            transition: all 0.3s ease;
+            padding: 0.875rem 2rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+        }
+        
+        .download-card .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+        }
+        
+        .download-card .btn-success:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
         }
         
         .loading-overlay {
@@ -434,125 +650,209 @@
 
         <!-- Results Section -->
         <div class="results-section" id="resultsSection">
-            <!-- Overall Metrics -->
-            <h2 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Evaluation Results</h2>
-            
-            <div class="row g-4 mb-4">
-                <div class="col-md-3 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-bullseye fa-2x mb-2" style="color: #60a5fa;"></i>
-                        <div class="metric-label">F1-Score (Micro)</div>
-                        <div class="metric-value" id="f1Micro">-</div>
-                        <small class="text-muted" id="f1MicroLabel">-</small>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-crosshairs fa-2x mb-2" style="color: #34d399;"></i>
-                        <div class="metric-label">Precision</div>
-                        <div class="metric-value" id="precision">-</div>
-                        <small class="text-muted">Micro-averaged</small>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-clipboard-check fa-2x mb-2" style="color: #60a5fa;"></i>
-                        <div class="metric-label">Recall</div>
-                        <div class="metric-value" id="recall">-</div>
-                        <small class="text-muted">Micro-averaged</small>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-check-double fa-2x mb-2" style="color: #fbbf24;"></i>
-                        <div class="metric-label">Exact Match</div>
-                        <div class="metric-value" id="exactMatch">-</div>
-                        <small class="text-muted">Perfect predictions</small>
-                    </div>
-                </div>
+            <!-- Results Header -->
+            <div class="results-header mb-5">
+                <h2 class="mb-2"><i class="fas fa-chart-bar me-2"></i>Evaluation Results</h2>
+                <p class="text-muted mb-0">
+                    Comprehensive performance metrics and detailed analysis
+                    <br><small><i class="fas fa-info-circle me-1"></i><strong>Note:</strong> Only open-ended questions (QuestionType = 0) are analyzed</small>
+                </p>
             </div>
 
-            <div class="row g-4 mb-4">
-                <div class="col-md-4 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-layer-group fa-2x mb-2" style="color: #9ca3af;"></i>
-                        <div class="metric-label">F1-Score (Macro)</div>
-                        <div class="metric-value" id="f1Macro">-</div>
-                        <small class="text-muted">Per-code average</small>
-                    </div>
-                </div>
-                <div class="col-md-4 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-project-diagram fa-2x mb-2" style="color: #9ca3af;"></i>
-                        <div class="metric-label">Jaccard Similarity</div>
-                        <div class="metric-value" id="jaccard">-</div>
-                        <small class="text-muted">Average overlap</small>
-                    </div>
-                </div>
-                <div class="col-md-4 col-sm-6">
-                    <div class="metric-card text-center">
-                        <i class="fas fa-list-ol fa-2x mb-2" style="color: #9ca3af;"></i>
-                        <div class="metric-label">Responses</div>
-                        <div class="metric-value" id="nResponses">-</div>
-                        <small class="text-muted">Total evaluated</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-6">
-                    <div class="chart-container">
-                        <h4 class="mb-3"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h4>
-                        <canvas id="metricsChart"></canvas>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="chart-container">
-                        <h4 class="mb-3"><i class="fas fa-signal me-2"></i>Confusion Matrix</h4>
-                        <canvas id="confusionChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Top/Bottom Codes -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-6">
-                    <div class="code-table">
-                        <h4 class="mb-3">
-                            <i class="fas fa-arrow-up me-2" style="color: #34d399;"></i>Top 10 Performing Codes
-                        </h4>
-                        <div id="topCodes"></div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="code-table">
-                        <h4 class="mb-3">
-                            <i class="fas fa-arrow-down me-2" style="color: #f87171;"></i>Bottom 10 Performing Codes
-                        </h4>
-                        <div id="bottomCodes"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mismatch Download Section -->
-            <div class="row g-4 mb-4" id="mismatchSection" style="display: none;">
-                <div class="col-12">
-                    <div class="code-table" style="max-height: none;">
-                        <div class="text-center py-4">
-                            <h4 class="mb-3">
-                                <i class="fas fa-exclamation-circle me-2" style="color: #f59e0b;"></i>
-                                <span id="mismatchTitle">Mismatched Responses Found</span>
-                            </h4>
-                            <div id="worstMismatches" class="mb-4"></div>
-                            <button class="btn btn-lg btn-primary" id="downloadCsvBtn" style="min-width: 250px;">
-                                <i class="fas fa-download me-2"></i>Download Complete Mismatch Report (CSV)
-                            </button>
-                            <p class="text-muted small mt-3 mb-0">
-                                Includes all mismatched responses with verbatim text, missed codes, and extra codes
-                            </p>
+            <!-- Primary Metrics Section -->
+            <div class="section-group mb-5">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-star me-2" style="color: var(--warning-color);"></i>Key Performance Indicators
+                </h3>
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card metric-primary text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-bullseye fa-2x" style="color: #60a5fa;"></i>
+                            </div>
+                            <div class="metric-label">F1-Score (Micro)</div>
+                            <div class="metric-value" id="f1Micro">-</div>
+                            <small class="text-muted" id="f1MicroLabel">-</small>
                         </div>
                     </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card metric-primary text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-crosshairs fa-2x" style="color: #34d399;"></i>
+                            </div>
+                            <div class="metric-label">Precision</div>
+                            <div class="metric-value" id="precision">-</div>
+                            <small class="text-muted">Micro-averaged</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card metric-primary text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-clipboard-check fa-2x" style="color: #60a5fa;"></i>
+                            </div>
+                            <div class="metric-label">Recall</div>
+                            <div class="metric-value" id="recall">-</div>
+                            <small class="text-muted">Micro-averaged</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card metric-primary text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-check-double fa-2x" style="color: #fbbf24;"></i>
+                            </div>
+                            <div class="metric-label">Exact Match</div>
+                            <div class="metric-value" id="exactMatch">-</div>
+                            <small class="text-muted">Perfect predictions</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secondary Metrics Section -->
+            <div class="section-group mb-5">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-chart-line me-2" style="color: var(--primary-color);"></i>Additional Metrics
+                </h3>
+                <div class="row g-4">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="metric-card text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-layer-group fa-2x" style="color: #9ca3af;"></i>
+                            </div>
+                            <div class="metric-label">F1-Score (Macro)</div>
+                            <div class="metric-value" id="f1Macro">-</div>
+                            <small class="text-muted">Per-code average</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="metric-card text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-project-diagram fa-2x" style="color: #9ca3af;"></i>
+                            </div>
+                            <div class="metric-label">Jaccard Similarity</div>
+                            <div class="metric-value" id="jaccard">-</div>
+                            <small class="text-muted">Average overlap</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="metric-card text-center">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-list-ol fa-2x" style="color: #9ca3af;"></i>
+                            </div>
+                            <div class="metric-label">Total Responses</div>
+                            <div class="metric-value" id="nResponses">-</div>
+                            <small class="text-muted">Evaluated</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Section - Prominent -->
+            <div class="section-group mb-5" id="downloadSection" style="display: none;">
+                <div class="download-card">
+                    <div class="row align-items-center g-4">
+                        <div class="col-lg-8">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="download-icon-wrapper me-3">
+                                    <i class="fas fa-file-csv fa-2x"></i>
+                                </div>
+                                <div>
+                                    <h4 class="mb-1" style="color: var(--text-primary); font-weight: 600;">
+                                        Download Complete Mismatch Report
+                                    </h4>
+                                    <p class="text-muted mb-0 small">
+                                        <i class="fas fa-info-circle me-1"></i>Available immediately after evaluation
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="mb-0" style="color: var(--text-secondary); line-height: 1.6;">
+                                Export all mismatched responses as a CSV file with verbatim text, missed codes, extra codes, and detailed analysis for further review and improvement.
+                            </p>
+                        </div>
+                        <div class="col-lg-4 text-lg-end">
+                            <button class="btn btn-lg btn-success w-100 w-lg-auto" id="downloadCsvBtn" disabled>
+                                <i class="fas fa-download me-2"></i>Download CSV
+                            </button>
+                            <div id="downloadStatus" class="mt-2 small text-muted" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualizations Section -->
+            <div class="section-group mb-5">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-chart-area me-2" style="color: var(--primary-color);"></i>Visualizations
+                </h3>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="chart-container">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h4 class="mb-0">
+                                    <i class="fas fa-chart-pie me-2"></i>Performance Overview
+                                </h4>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="metricsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="chart-container">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h4 class="mb-0">
+                                    <i class="fas fa-signal me-2"></i>Confusion Matrix
+                                </h4>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="confusionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Performance Analysis -->
+            <div class="section-group mb-5">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-code me-2" style="color: var(--primary-color);"></i>Code Performance Analysis
+                </h3>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="code-table">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="fas fa-arrow-up me-2" style="color: #34d399; font-size: 1.25rem;"></i>
+                                <h4 class="mb-0">Top 10 Performing Codes</h4>
+                            </div>
+                            <div id="topCodes"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="code-table">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="fas fa-arrow-down me-2" style="color: #f87171; font-size: 1.25rem;"></i>
+                                <h4 class="mb-0">Bottom 10 Performing Codes</h4>
+                            </div>
+                            <div id="bottomCodes"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mismatch Details Section -->
+            <div class="section-group mb-5" id="mismatchSection" style="display: none;">
+                <h3 class="section-title mb-3">
+                    <i class="fas fa-exclamation-triangle me-2" style="color: var(--warning-color);"></i>Top Mismatches
+                </h3>
+                <div class="code-table mismatch-details" style="padding: 1.5rem;">
+                    <div class="mb-3">
+                        <h5 class="mb-1" id="mismatchTitle">Mismatched Responses</h5>
+                        <small class="text-muted">
+                            <span class="badge bg-danger me-1">❌ Missed</span> = Should have predicted | 
+                            <span class="badge bg-warning text-dark me-1">⚠️ Extra</span> = Should NOT have predicted
+                        </small>
+                    </div>
+                    <div id="worstMismatches" class="mismatch-list"></div>
                 </div>
             </div>
         </div>
@@ -752,19 +1052,58 @@
                     displayCodeList('bottomCodes', data.bottom_codes);
                 }
 
-                // Show download button if there are mismatches
-                if (data.has_mismatches && data.mismatch_count > 0) {
-                    document.getElementById('mismatchSection').style.display = 'block';
-                    document.getElementById('mismatchTitle').textContent = `Found ${data.mismatch_count} Mismatched Responses`;
-                    document.getElementById('worstMismatches').innerHTML = `
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>${data.mismatch_count}</strong> mismatched responses found.
-                            Click the button below to download the complete mismatch report with verbatim text and code details.
-                        </div>
-                    `;
+                // Show download section when results are available
+                document.getElementById('downloadSection').style.display = 'block';
+                
+                // Get download button and enable/disable based on mismatches
+                const downloadBtn = document.getElementById('downloadCsvBtn');
+                if (!downloadBtn) {
+                    console.error('[ERROR] Download button not found!');
                 } else {
-                    document.getElementById('mismatchSection').style.display = 'none';
+                    // Check multiple possible locations for mismatch data
+                    const mismatchCount = data.mismatch_count || 
+                                         (data.overall && data.overall.n_mismatches) || 
+                                         0;
+                    const hasMismatches = data.has_mismatches === true || 
+                                         mismatchCount > 0 ||
+                                         (data.overall && data.overall.n_mismatches > 0);
+                    
+                    console.log('[DEBUG] Download button state check:', {
+                        has_mismatches: data.has_mismatches,
+                        mismatch_count: data.mismatch_count,
+                        n_mismatches: data.overall?.n_mismatches,
+                        calculatedMismatchCount: mismatchCount,
+                        calculatedHasMismatches: hasMismatches,
+                        fullData: data
+                    });
+                    
+                    if (hasMismatches && mismatchCount > 0) {
+                        document.getElementById('mismatchSection').style.display = 'block';
+                        document.getElementById('mismatchTitle').textContent = `Found ${mismatchCount} Mismatched Responses`;
+                        document.getElementById('worstMismatches').innerHTML = `
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>${mismatchCount}</strong> mismatched responses found.
+                                Click the button above to download the complete mismatch report with verbatim text and code details.
+                            </div>
+                        `;
+                        // Enable download button
+                        downloadBtn.removeAttribute('disabled');
+                        downloadBtn.disabled = false;
+                        downloadBtn.style.opacity = '1';
+                        downloadBtn.style.cursor = 'pointer';
+                        downloadBtn.classList.remove('disabled');
+                        console.log('[DEBUG] ✅ Download button ENABLED - mismatches found:', mismatchCount);
+                    } else {
+                        document.getElementById('mismatchSection').style.display = 'none';
+                        // Disable download button if no mismatches
+                        downloadBtn.setAttribute('disabled', 'disabled');
+                        downloadBtn.disabled = true;
+                        downloadBtn.style.opacity = '0.5';
+                        downloadBtn.style.cursor = 'not-allowed';
+                        downloadBtn.classList.add('disabled');
+                        console.log('[DEBUG] ❌ Download button DISABLED - no mismatches found. Count:', mismatchCount);
+                    }
                 }
 
                 // Create charts (wrap in try-catch in case Chart.js fails)
@@ -781,8 +1120,10 @@
                 }
 
                 // Show results section
-                document.getElementById('resultsSection').style.display = 'block';
-                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const resultsSection = document.getElementById('resultsSection');
+                resultsSection.style.display = 'block';
+                resultsSection.classList.add('active');
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
                 console.log('[DEBUG] displayResults completed successfully');
             } catch (error) {
@@ -846,67 +1187,50 @@
 
             mismatches.forEach((mismatch, idx) => {
                 const mismatchDiv = document.createElement('div');
-                mismatchDiv.className = 'border-bottom pb-3 mb-3';
+                mismatchDiv.className = 'border-bottom pb-2 mb-3';
                 
+                // Compact header
                 let html = `
-                    <div class="mb-2">
-                        <span class="badge badge-secondary me-2">#${idx + 1}</span>
-                        <small class="text-muted">Respondent: ${mismatch.respondent_id} | Question: ${mismatch.question_id}</small>
-                        <span class="badge bg-danger ms-2">${mismatch.error_count} errors</span>
-                        <small class="text-muted ms-2">Jaccard: ${mismatch.jaccard.toFixed(3)}</small>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div>
+                            <span class="badge bg-secondary me-2">#${idx + 1}</span>
+                            <small class="text-muted">R: ${mismatch.respondent_id} | Q: ${mismatch.question_id}</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-danger me-2">${mismatch.error_count} errors</span>
+                            <small class="text-muted">J: ${mismatch.jaccard.toFixed(2)}</small>
+                        </div>
                     </div>
                 `;
 
-                // Show verbatim text
-                if (mismatch.verbatim && mismatch.verbatim !== 'N/A') {
-                    const displayText = mismatch.verbatim.length > 200 ? 
-                        mismatch.verbatim.substring(0, 200) + '...' : 
-                        mismatch.verbatim;
+                // Compact missed codes row - show code key and description
+                if (mismatch.missed_codes && mismatch.missed_codes.length > 0) {
+                    const missedItems = mismatch.missed_codes.map((code, i) => {
+                        const desc = mismatch.missed_descriptions && mismatch.missed_descriptions[i] ? mismatch.missed_descriptions[i] : 'Unknown';
+                        return `<span class="badge bg-danger me-2 mb-1"><strong>${code}</strong>: ${desc}</span>`;
+                    }).join('');
                     html += `
-                        <div class="mb-2 p-2" style="background: var(--surface-bg); border-left: 3px solid var(--primary-color); border-radius: 0.25rem;">
-                            <div class="small" style="color: var(--text-secondary); font-style: italic;">
-                                "${displayText}"
+                        <div class="mb-2">
+                            <strong class="text-danger small me-2">❌ Missed:</strong>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                ${missedItems}
                             </div>
                         </div>
                     `;
                 }
 
-                // Show missed codes
-                if (mismatch.missed_codes && mismatch.missed_codes.length > 0) {
-                    html += `
-                        <div class="mb-2">
-                            <div class="small" style="color: #f87171;">
-                                <i class="fas fa-times-circle me-1"></i>Missed ${mismatch.missed_codes.length} code(s):
-                            </div>
-                            <div class="ms-3 mt-1">
-                    `;
-                    mismatch.missed_descriptions.forEach((desc, i) => {
-                        html += `<div class="small text-muted">• ${desc}</div>`;
-                    });
-                    html += `</div></div>`;
-                }
-
-                // Show extra codes
+                // Compact extra codes row - show code key and description
                 if (mismatch.extra_codes && mismatch.extra_codes.length > 0) {
+                    const extraItems = mismatch.extra_codes.map((code, i) => {
+                        const desc = mismatch.extra_descriptions && mismatch.extra_descriptions[i] ? mismatch.extra_descriptions[i] : 'Unknown';
+                        return `<span class="badge bg-warning text-dark me-2 mb-1"><strong>${code}</strong>: ${desc}</span>`;
+                    }).join('');
                     html += `
                         <div class="mb-2">
-                            <div class="small" style="color: #fbbf24;">
-                                <i class="fas fa-exclamation-triangle me-1"></i>Incorrectly added ${mismatch.extra_codes.length} code(s):
+                            <strong class="text-warning small me-2">⚠️ Extra:</strong>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                ${extraItems}
                             </div>
-                            <div class="ms-3 mt-1">
-                    `;
-                    mismatch.extra_descriptions.forEach((desc, i) => {
-                        html += `<div class="small text-muted">• ${desc}</div>`;
-                    });
-                    html += `</div></div>`;
-                }
-
-                // Show correct count
-                const correctCount = mismatch.predicted.length - mismatch.extra_codes.length;
-                if (correctCount > 0) {
-                    html += `
-                        <div class="small" style="color: #34d399;">
-                            <i class="fas fa-check-circle me-1"></i>Correctly predicted ${correctCount} code(s)
                         </div>
                     `;
                 }
@@ -919,11 +1243,17 @@
         // CSV Download Handler
         document.getElementById('downloadCsvBtn').addEventListener('click', async () => {
             const btn = document.getElementById('downloadCsvBtn');
+            const statusDiv = document.getElementById('downloadStatus');
             const originalText = btn.innerHTML;
             
             try {
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating CSV...';
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.innerHTML = '<i class="fas fa-clock me-1"></i>Generating CSV file...';
+                    statusDiv.style.color = 'var(--text-secondary)';
+                }
                 
                 console.log('[CSV] Starting download...');
                 const response = await fetch('/api/download-mismatches');
@@ -931,15 +1261,26 @@
                 console.log('[CSV] Response status:', response.status);
                 
                 if (!response.ok) {
-                    // Try to get error message
+                    // Try to get detailed error message
                     let errorMsg = 'Download failed';
+                    let suggestion = '';
                     try {
                         const data = await response.json();
                         errorMsg = data.error || errorMsg;
+                        if (data.message) {
+                            errorMsg += '\n\n' + data.message;
+                        }
+                        if (data.suggestion) {
+                            suggestion = data.suggestion;
+                        }
                     } catch (e) {
                         errorMsg = `Server error: ${response.status} ${response.statusText}`;
                     }
-                    alert('Download error: ' + errorMsg);
+                    
+                    // Show detailed error in a better format
+                    const fullMsg = suggestion ? errorMsg + '\n\n💡 ' + suggestion : errorMsg;
+                    alert('Download Error\n\n' + fullMsg);
+                    console.error('[CSV] Download error details:', { errorMsg, suggestion });
                     return;
                 }
                 
@@ -965,8 +1306,19 @@
                 document.body.removeChild(a);
                 
                 console.log('[CSV] Download complete');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle me-1" style="color: var(--success-color);"></i>Download complete!';
+                    statusDiv.style.color = 'var(--success-color)';
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 3000);
+                }
             } catch (error) {
                 console.error('[CSV] Download error:', error);
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1" style="color: var(--danger-color);"></i>Download failed';
+                    statusDiv.style.color = 'var(--danger-color)';
+                }
                 alert('Download failed: ' + error.message + '. Please try again or check the browser console.');
             } finally {
                 btn.disabled = false;

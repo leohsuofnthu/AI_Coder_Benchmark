@@ -11,6 +11,7 @@
 
 # Web Application Dependencies
 flask>=2.3.0     # Web framework for single-page app
+flask-session>=0.5.0  # Server-side session management (robust alternative to cookie sessions)
 gunicorn>=21.2.0 # WSGI server for production deployment
 
 # Optional: For enhanced analysis or visualization (not currently used)
