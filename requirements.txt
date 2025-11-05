@@ -1,0 +1,26 @@
+# AI Coder Evaluation Metrics - Dependencies
+# Python 3.7+
+
+# Core evaluation scripts use only Python standard library:
+# - xml.etree.ElementTree (built-in)
+# - collections (built-in)
+# - pathlib (built-in)
+# - json (built-in)
+
+# No external dependencies required for command-line scripts!
+
+# Web Application Dependencies
+flask>=2.3.0  # Web framework for single-page app
+
+# Optional: For enhanced analysis or visualization (not currently used)
+# numpy>=1.20.0
+# pandas>=1.3.0
+# matplotlib>=3.4.0
+# seaborn>=0.11.0
+# scikit-learn>=0.24.0  # For additional metrics if needed
+
+# Development
+# pytest>=6.2.0  # For testing
+# black>=21.0    # For code formatting
+# flake8>=3.9.0  # For linting
+

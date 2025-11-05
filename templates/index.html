@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Coder Evaluation</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #0a0e1a;
+            --card-bg: #1a1f35;
+            --card-border: #2a3148;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-blue: #60a5fa;
+            --surface-bg: #141829;
+        }
+        
+        body {
+            background: var(--dark-bg);
+            min-height: 100vh;
+            font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-primary);
+        }
+        
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--card-border);
+            animation: fadeInDown 0.6s;
+        }
+        
+        .header h1 {
+            font-size: 2.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            letter-spacing: -0.025em;
+        }
+        
+        .header p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        
+        .upload-section {
+            background: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 2.5rem;
+            border: 1px solid var(--card-border);
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.6s;
+        }
+        
+        .upload-section h2, .upload-section h3 {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.125rem;
+            letter-spacing: -0.025em;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--card-border);
+            border-radius: 0.75rem;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            background: var(--surface-bg);
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.05);
+            transform: translateY(-2px);
+        }
+        
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area h4 {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .upload-area p {
+            color: var(--text-muted);
+        }
+        
+        .benchmark-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .benchmark-card {
+            background: var(--surface-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .benchmark-card h5 {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .benchmark-card p {
+            color: var(--text-muted);
+        }
+        
+        .benchmark-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .benchmark-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 1px var(--primary-color);
+        }
+        
+        .btn-evaluate {
+            background: var(--primary-color);
+            border: none;
+            padding: 0.875rem 2.5rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            letter-spacing: 0.025em;
+        }
+        
+        .btn-evaluate:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .btn-evaluate:disabled {
+            background: var(--card-border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        
+        .results-section {
+            display: none;
+            animation: fadeInUp 0.6s;
+        }
+        
+        .results-section h2 {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.25rem;
+            letter-spacing: -0.025em;
+        }
+        
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: all 0.2s;
+            height: 100%;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+        }
+        
+        .metric-card i {
+            opacity: 0.7;
+        }
+        
+        .metric-value {
+            font-size: 2.25rem;
+            font-weight: 600;
+            margin: 0.5rem 0;
+            letter-spacing: -0.025em;
+        }
+        
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 500;
+        }
+        
+        .metric-card small {
+            color: var(--text-muted);
+        }
+        
+        .metric-excellent { color: var(--success-color); }
+        .metric-good { color: var(--accent-blue); }
+        .metric-fair { color: var(--warning-color); }
+        .metric-poor { color: var(--danger-color); }
+        
+        .chart-container {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-container h4 {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        
+        .code-table {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .code-table h4 {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        
+        .code-table .border-bottom {
+            border-color: var(--card-border) !important;
+        }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 26, 0.95);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-overlay h3 {
+            color: var(--text-primary);
+        }
+        
+        .loading-overlay p {
+            color: var(--text-secondary);
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--card-border);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .badge {
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+        
+        .badge-depth-1 { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-depth-2 { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-depth-3 { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-depth-4 { background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+        
+        .badge-primary {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .badge-secondary {
+            background: rgba(107, 114, 128, 0.15);
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+        }
+        
+        .bg-success {
+            background: rgba(34, 197, 94, 0.15) !important;
+            color: #86efac !important;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .bg-warning {
+            background: rgba(245, 158, 11, 0.15) !important;
+            color: #fcd34d !important;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .bg-danger {
+            background: rgba(239, 68, 68, 0.15) !important;
+            color: #fca5a5 !important;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .alert-custom {
+            border-radius: 0.75rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+        }
+        
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--text-primary);
+        }
+        
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="text-center">
+            <div class="spinner mb-3"></div>
+            <h3>Evaluating Model...</h3>
+            <p>Processing validation and metrics calculation</p>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>AI Coder Evaluation Platform</h1>
+            <p>Multi-label classification evaluation for response coding models</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2 class="mb-4"><i class="fas fa-upload me-2"></i>Upload Model Output</h2>
+            
+            <!-- Drag & Drop Area -->
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h4>Drag & Drop XML File Here</h4>
+                <p class="text-muted">or click to browse</p>
+                <input type="file" id="fileInput" accept=".xml" style="display: none;">
+                <div id="fileInfo" class="mt-3" style="display: none;">
+                    <span class="badge bg-primary fs-6">
+                        <i class="fas fa-file-code me-2"></i><span id="fileName"></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Benchmark Selection -->
+            <h3 class="mt-5 mb-3"><i class="fas fa-database me-2"></i>Select Benchmark</h3>
+            <div class="benchmark-grid" id="benchmarkGrid">
+                {% for id, benchmark in benchmarks.items() %}
+                <div class="benchmark-card" data-benchmark="{{ id }}">
+                    <h5 class="mb-2">
+                        <i class="fas fa-file-alt me-2"></i>{{ benchmark.name }}
+                    </h5>
+                    <p class="text-muted mb-2" style="font-size: 0.9rem;">{{ benchmark.description }}</p>
+                    <small class="badge bg-secondary">{{ benchmark.size }}</small>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Evaluate Button -->
+            <div class="text-center mt-4">
+                <button class="btn btn-evaluate text-white" id="evaluateBtn" disabled>
+                    <i class="fas fa-chart-line me-2"></i>Evaluate Model
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <!-- Overall Metrics -->
+            <h2 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Evaluation Results</h2>
+            
+            <div class="row g-4 mb-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-bullseye fa-2x mb-2" style="color: #60a5fa;"></i>
+                        <div class="metric-label">F1-Score (Micro)</div>
+                        <div class="metric-value" id="f1Micro">-</div>
+                        <small class="text-muted" id="f1MicroLabel">-</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-crosshairs fa-2x mb-2" style="color: #34d399;"></i>
+                        <div class="metric-label">Precision</div>
+                        <div class="metric-value" id="precision">-</div>
+                        <small class="text-muted">Micro-averaged</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-clipboard-check fa-2x mb-2" style="color: #60a5fa;"></i>
+                        <div class="metric-label">Recall</div>
+                        <div class="metric-value" id="recall">-</div>
+                        <small class="text-muted">Micro-averaged</small>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-check-double fa-2x mb-2" style="color: #fbbf24;"></i>
+                        <div class="metric-label">Exact Match</div>
+                        <div class="metric-value" id="exactMatch">-</div>
+                        <small class="text-muted">Perfect predictions</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-4 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-layer-group fa-2x mb-2" style="color: #9ca3af;"></i>
+                        <div class="metric-label">F1-Score (Macro)</div>
+                        <div class="metric-value" id="f1Macro">-</div>
+                        <small class="text-muted">Per-code average</small>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-project-diagram fa-2x mb-2" style="color: #9ca3af;"></i>
+                        <div class="metric-label">Jaccard Similarity</div>
+                        <div class="metric-value" id="jaccard">-</div>
+                        <small class="text-muted">Average overlap</small>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-6">
+                    <div class="metric-card text-center">
+                        <i class="fas fa-list-ol fa-2x mb-2" style="color: #9ca3af;"></i>
+                        <div class="metric-label">Responses</div>
+                        <div class="metric-value" id="nResponses">-</div>
+                        <small class="text-muted">Total evaluated</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h4 class="mb-3"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h4>
+                        <canvas id="metricsChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h4 class="mb-3"><i class="fas fa-signal me-2"></i>Confusion Matrix</h4>
+                        <canvas id="confusionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top/Bottom Codes -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <div class="code-table">
+                        <h4 class="mb-3">
+                            <i class="fas fa-arrow-up me-2" style="color: #34d399;"></i>Top 10 Performing Codes
+                        </h4>
+                        <div id="topCodes"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="code-table">
+                        <h4 class="mb-3">
+                            <i class="fas fa-arrow-down me-2" style="color: #f87171;"></i>Bottom 10 Performing Codes
+                        </h4>
+                        <div id="bottomCodes"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Worst Mismatches -->
+            <div class="row g-4 mb-4" id="mismatchSection" style="display: none;">
+                <div class="col-12">
+                    <div class="code-table" style="max-height: 600px;">
+                        <h4 class="mb-3">
+                            <i class="fas fa-exclamation-circle me-2" style="color: #f59e0b;"></i>
+                            <span id="mismatchTitle">Worst Mismatched Responses</span>
+                        </h4>
+                        <div id="worstMismatches"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let selectedFile = null;
+        let selectedBenchmark = null;
+        let metricsChart = null;
+        let confusionChart = null;
+
+        // File Upload Handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+        
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            if (fileInput.files.length > 0) {
+                selectedFile = fileInput.files[0];
+                fileName.textContent = selectedFile.name;
+                fileInfo.style.display = 'block';
+                checkReadyToEvaluate();
+            }
+        }
+
+        // Benchmark Selection
+        document.querySelectorAll('.benchmark-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.benchmark-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedBenchmark = this.dataset.benchmark;
+                checkReadyToEvaluate();
+            });
+        });
+
+        function checkReadyToEvaluate() {
+            const btn = document.getElementById('evaluateBtn');
+            btn.disabled = !(selectedFile && selectedBenchmark);
+        }
+
+        // Evaluate Button
+        document.getElementById('evaluateBtn').addEventListener('click', async () => {
+            if (!selectedFile || !selectedBenchmark) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('benchmark', selectedBenchmark);
+
+            document.getElementById('loadingOverlay').classList.add('active');
+
+            try {
+                const response = await fetch('/api/evaluate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    // Display detailed error message
+                    let errorHtml = '<div class="alert alert-danger alert-custom" role="alert">';
+                    errorHtml += '<h4 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>' + data.error + '</h4>';
+                    
+                    if (data.message) {
+                        errorHtml += '<hr><pre style="white-space: pre-wrap; font-size: 0.9rem;">' + data.message + '</pre>';
+                    }
+                    
+                    if (data.suggestion) {
+                        errorHtml += '<hr><p class="mb-0"><strong><i class="fas fa-lightbulb me-2"></i>Suggestion:</strong> ' + data.suggestion + '</p>';
+                    }
+                    
+                    errorHtml += '</div>';
+                    
+                    // Insert error message before results section
+                    const resultsSection = document.getElementById('resultsSection');
+                    resultsSection.innerHTML = errorHtml;
+                    resultsSection.style.display = 'block';
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return;
+                }
+
+                displayResults(data);
+            } catch (error) {
+                alert('Evaluation failed: ' + error.message);
+            } finally {
+                document.getElementById('loadingOverlay').classList.remove('active');
+            }
+        });
+
+        function displayResults(data) {
+            const results = data.overall;
+            
+            // Update metric cards
+            updateMetric('f1Micro', results.f1_micro, 'f1MicroLabel');
+            updateMetric('precision', results.precision_micro);
+            updateMetric('recall', results.recall_micro);
+            updateMetric('exactMatch', results.exact_match_ratio, null, true);
+            updateMetric('f1Macro', results.f1_macro);
+            updateMetric('jaccard', results.jaccard_mean);
+            document.getElementById('nResponses').textContent = results.n_responses.toLocaleString();
+
+            // Display top/bottom codes
+            displayCodeList('topCodes', data.top_codes);
+            displayCodeList('bottomCodes', data.bottom_codes);
+
+            // Display worst mismatches
+            if (data.worst_mismatches && data.worst_mismatches.length > 0) {
+                displayMismatches(data.worst_mismatches, results.n_mismatches);
+                document.getElementById('mismatchSection').style.display = 'block';
+            }
+
+            // Create charts
+            createMetricsChart(results);
+            createConfusionChart(results);
+
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function updateMetric(elementId, value, labelId = null, isPercentage = false) {
+            const element = document.getElementById(elementId);
+            const displayValue = isPercentage ? (value * 100).toFixed(1) + '%' : value.toFixed(3);
+            element.textContent = displayValue;
+
+            // Color coding
+            element.className = 'metric-value ';
+            if (value >= 0.75) element.classList.add('metric-excellent');
+            else if (value >= 0.60) element.classList.add('metric-good');
+            else if (value >= 0.40) element.classList.add('metric-fair');
+            else element.classList.add('metric-poor');
+
+            if (labelId) {
+                const label = document.getElementById(labelId);
+                if (value >= 0.75) label.textContent = 'Excellent';
+                else if (value >= 0.60) label.textContent = 'Good';
+                else if (value >= 0.40) label.textContent = 'Fair';
+                else label.textContent = 'Needs Improvement';
+            }
+        }
+
+        function displayCodeList(containerId, codes) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            codes.forEach((code, idx) => {
+                const codeDiv = document.createElement('div');
+                codeDiv.className = 'border-bottom pb-2 mb-2';
+                codeDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <small class="badge badge-depth-${code.depth} me-2">L${code.depth}</small>
+                            <small class="text-muted">[${code.code}]</small>
+                            <div class="mt-1"><strong>${code.description}</strong></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge ${code.f1 >= 0.7 ? 'bg-success' : code.f1 >= 0.5 ? 'bg-warning' : 'bg-danger'}">
+                                F1: ${code.f1.toFixed(3)}
+                            </div>
+                            <div class="small text-muted mt-1">n=${code.support}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(codeDiv);
+            });
+        }
+
+        function displayMismatches(mismatches, totalMismatches) {
+            const container = document.getElementById('worstMismatches');
+            const title = document.getElementById('mismatchTitle');
+            container.innerHTML = '';
+            title.textContent = `Top ${mismatches.length} Worst Mismatches (${totalMismatches} total)`;
+
+            mismatches.forEach((mismatch, idx) => {
+                const mismatchDiv = document.createElement('div');
+                mismatchDiv.className = 'border-bottom pb-3 mb-3';
+                
+                let html = `
+                    <div class="mb-2">
+                        <span class="badge badge-secondary me-2">#${idx + 1}</span>
+                        <small class="text-muted">Respondent: ${mismatch.respondent_id} | Question: ${mismatch.question_id}</small>
+                        <span class="badge bg-danger ms-2">${mismatch.error_count} errors</span>
+                        <small class="text-muted ms-2">Jaccard: ${mismatch.jaccard.toFixed(3)}</small>
+                    </div>
+                `;
+
+                // Show missed codes
+                if (mismatch.missed_codes && mismatch.missed_codes.length > 0) {
+                    html += `
+                        <div class="mb-2">
+                            <div class="small" style="color: #f87171;">
+                                <i class="fas fa-times-circle me-1"></i>Missed ${mismatch.missed_codes.length} code(s):
+                            </div>
+                            <div class="ms-3 mt-1">
+                    `;
+                    mismatch.missed_descriptions.forEach((desc, i) => {
+                        html += `<div class="small text-muted">• ${desc}</div>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                // Show extra codes
+                if (mismatch.extra_codes && mismatch.extra_codes.length > 0) {
+                    html += `
+                        <div class="mb-2">
+                            <div class="small" style="color: #fbbf24;">
+                                <i class="fas fa-exclamation-triangle me-1"></i>Incorrectly added ${mismatch.extra_codes.length} code(s):
+                            </div>
+                            <div class="ms-3 mt-1">
+                    `;
+                    mismatch.extra_descriptions.forEach((desc, i) => {
+                        html += `<div class="small text-muted">• ${desc}</div>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                // Show correct count
+                const correctCount = mismatch.predicted.length - mismatch.extra_codes.length;
+                if (correctCount > 0) {
+                    html += `
+                        <div class="small" style="color: #34d399;">
+                            <i class="fas fa-check-circle me-1"></i>Correctly predicted ${correctCount} code(s)
+                        </div>
+                    `;
+                }
+
+                mismatchDiv.innerHTML = html;
+                container.appendChild(mismatchDiv);
+            });
+        }
+
+        function createMetricsChart(results) {
+            const ctx = document.getElementById('metricsChart');
+            
+            if (metricsChart) metricsChart.destroy();
+
+            metricsChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['F1 (Micro)', 'F1 (Macro)', 'Precision', 'Recall', 'Jaccard', 'Exact Match'],
+                    datasets: [{
+                        label: 'Model Performance',
+                        data: [
+                            results.f1_micro,
+                            results.f1_macro,
+                            results.precision_micro,
+                            results.recall_micro,
+                            results.jaccard_mean,
+                            results.exact_match_ratio
+                        ],
+                        fill: true,
+                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        pointBackgroundColor: 'rgb(59, 130, 246)',
+                        pointBorderColor: 'rgba(26, 31, 53, 1)',
+                        pointHoverBackgroundColor: 'rgb(96, 165, 250)',
+                        pointHoverBorderColor: 'rgb(59, 130, 246)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                stepSize: 0.2,
+                                color: '#9ca3af',
+                                backdropColor: 'transparent'
+                            },
+                            grid: {
+                                color: 'rgba(42, 49, 72, 0.5)'
+                            },
+                            angleLines: {
+                                color: 'rgba(42, 49, 72, 0.5)'
+                            },
+                            pointLabels: {
+                                color: '#e5e7eb',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createConfusionChart(results) {
+            const ctx = document.getElementById('confusionChart');
+            
+            if (confusionChart) confusionChart.destroy();
+
+            confusionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['True Positives', 'False Positives', 'False Negatives'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [results.total_tp, results.total_fp, results.total_fn],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.5)',
+                            'rgba(239, 68, 68, 0.5)',
+                            'rgba(245, 158, 11, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgb(34, 197, 94)',
+                            'rgb(239, 68, 68)',
+                            'rgb(245, 158, 11)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#9ca3af'
+                            },
+                            grid: {
+                                color: 'rgba(42, 49, 72, 0.5)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#e5e7eb'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
