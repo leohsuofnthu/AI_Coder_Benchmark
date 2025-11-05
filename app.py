@@ -8,14 +8,18 @@ Usage:
 Then open: http://localhost:5000
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file, session
 from pathlib import Path
 import json
+import csv
+import io
+import os
 from evaluate_model import CodebookEvaluator
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Create uploads directory
 Path('uploads').mkdir(exist_ok=True)
@@ -172,11 +176,24 @@ def evaluate():
         for depth in depth_stats:
             depth_stats[depth]['avg_f1'] /= depth_stats[depth]['count']
         
-        # Get worst mismatches (top 20 with most errors)
-        mismatches = evaluator.metrics.get('mismatches', [])[:20]
+        # Get worst mismatches (top 50 with most errors)
+        mismatches = evaluator.metrics.get('mismatches', [])[:50]
         
-        # Enrich mismatches with code descriptions
+        # Load verbatims from benchmark
+        import xml.etree.ElementTree as ET
+        verbatims = {}
+        benchmark_tree = ET.parse(benchmark_path)
+        benchmark_root = benchmark_tree.getroot()
+        
+        for response in benchmark_root.findall('.//Response'):
+            respondent = response.find('DRORespondent')
+            verbatim = response.find('DROVerbatim')
+            if respondent is not None and verbatim is not None:
+                verbatims[respondent.text] = verbatim.text or ""
+        
+        # Enrich mismatches with code descriptions and verbatim text
         for mismatch in mismatches:
+            mismatch['verbatim'] = verbatims.get(mismatch['respondent_id'], 'N/A')
             mismatch['missed_descriptions'] = [
                 evaluator.codebook.get(code, {}).get('description', 'Unknown')
                 for code in mismatch['missed_codes']
@@ -216,6 +233,13 @@ def evaluate():
             'worst_mismatches': mismatches
         }
         
+        # Store all mismatches in session for CSV download
+        session['all_mismatches'] = evaluator.metrics.get('mismatches', [])
+        session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
+        session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
+                               for k, v in evaluator.codebook.items()}
+        session['verbatims'] = verbatims
+        
         # Clean up uploaded file
         upload_path.unlink(missing_ok=True)
         
@@ -227,6 +251,91 @@ def evaluate():
         print(error_msg)
         print(traceback.format_exc())
         return jsonify({'error': error_msg, 'details': traceback.format_exc()}), 500
+
+
+@app.route('/api/download-mismatches')
+def download_mismatches():
+    """Download mismatches as CSV file."""
+    try:
+        # Get data from session
+        if 'all_mismatches' not in session:
+            return jsonify({'error': 'No evaluation data found. Please run evaluation first.'}), 400
+        
+        mismatches = session['all_mismatches']
+        benchmark_name = session.get('benchmark_name', 'Benchmark')
+        codebook = session.get('codebook', {})
+        verbatims = session.get('verbatims', {})
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'Rank',
+            'Respondent ID',
+            'Question ID',
+            'Verbatim',
+            'Error Count',
+            'Jaccard Score',
+            'Missed Codes (False Negatives)',
+            'Missed Descriptions',
+            'Extra Codes (False Positives)',
+            'Extra Descriptions',
+            'Correct Codes',
+            'Ground Truth (All)',
+            'Predicted (All)'
+        ])
+        
+        # Data rows
+        for rank, mismatch in enumerate(mismatches, 1):
+            respondent_id = mismatch['respondent_id']
+            verbatim = verbatims.get(respondent_id, 'N/A')
+            
+            # Get code descriptions
+            missed_descs = [
+                codebook.get(code, {}).get('description', 'Unknown')
+                for code in mismatch['missed_codes']
+            ]
+            extra_descs = [
+                codebook.get(code, {}).get('description', 'Unknown')
+                for code in mismatch['extra_codes']
+            ]
+            
+            correct_codes = set(mismatch['predicted']) & set(mismatch['ground_truth'])
+            
+            writer.writerow([
+                rank,
+                respondent_id,
+                mismatch['question_id'],
+                verbatim,
+                mismatch['error_count'],
+                f"{mismatch['jaccard']:.3f}",
+                ', '.join(mismatch['missed_codes']),
+                ' | '.join(missed_descs),
+                ', '.join(mismatch['extra_codes']),
+                ' | '.join(extra_descs),
+                len(correct_codes),
+                ', '.join(mismatch['ground_truth']),
+                ', '.join(mismatch['predicted'])
+            ])
+        
+        # Prepare file for download
+        output.seek(0)
+        filename = f"{benchmark_name.replace(' ', '_')}_mismatches.csv"
+        
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"Download error: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/analyze/<benchmark_id>')

@@ -524,13 +524,99 @@ class CodebookEvaluator:
         
         print(f"\n💾 Detailed report saved to: {output_path}")
     
-    def run(self, save_report: bool = True, show_mismatches: int = 0, with_verbatims: bool = False):
+    def save_mismatches_report(self, output_path: str = "mismatches_report.csv"):
+        """
+        Save detailed mismatch report with verbatim text to CSV.
+        
+        Args:
+            output_path: Path to save CSV file
+        """
+        if 'mismatches' not in self.metrics or not self.metrics['mismatches']:
+            print("\n✓ No mismatches to export - all predictions are perfect!")
+            return
+        
+        import csv
+        import xml.etree.ElementTree as ET
+        
+        print(f"\n📊 Generating mismatches report...")
+        
+        # Load verbatims from benchmark
+        verbatims = {}
+        tree = ET.parse(self.benchmark_path)
+        root = tree.getroot()
+        
+        for response in root.findall('.//Response'):
+            respondent = response.find('DRORespondent')
+            verbatim = response.find('DROVerbatim')
+            if respondent is not None and verbatim is not None:
+                verbatims[respondent.text] = verbatim.text or ""
+        
+        # Write CSV
+        with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            
+            # Header
+            writer.writerow([
+                'Rank',
+                'Respondent ID',
+                'Question ID',
+                'Verbatim',
+                'Error Count',
+                'Jaccard Score',
+                'Missed Codes (False Negatives)',
+                'Missed Descriptions',
+                'Extra Codes (False Positives)',
+                'Extra Descriptions',
+                'Correct Codes',
+                'Ground Truth (All)',
+                'Predicted (All)'
+            ])
+            
+            # Data rows
+            for rank, mismatch in enumerate(self.metrics['mismatches'], 1):
+                respondent_id = mismatch['respondent_id']
+                verbatim = verbatims.get(respondent_id, 'N/A')
+                
+                # Get code descriptions
+                missed_descs = [
+                    self.codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch['missed_codes']
+                ]
+                extra_descs = [
+                    self.codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch['extra_codes']
+                ]
+                
+                correct_codes = set(mismatch['predicted']) & set(mismatch['ground_truth'])
+                
+                writer.writerow([
+                    rank,
+                    respondent_id,
+                    mismatch['question_id'],
+                    verbatim,
+                    mismatch['error_count'],
+                    f"{mismatch['jaccard']:.3f}",
+                    ', '.join(mismatch['missed_codes']),
+                    ' | '.join(missed_descs),
+                    ', '.join(mismatch['extra_codes']),
+                    ' | '.join(extra_descs),
+                    len(correct_codes),
+                    ', '.join(mismatch['ground_truth']),
+                    ', '.join(mismatch['predicted'])
+                ])
+        
+        print(f"💾 Mismatches report saved to: {output_path}")
+        print(f"   Total mismatches: {len(self.metrics['mismatches'])}")
+    
+    def run(self, save_report: bool = True, show_mismatches: int = 0, with_verbatims: bool = False, 
+            export_mismatches: str = None):
         """Run complete evaluation pipeline.
         
         Args:
             save_report: Whether to save JSON report
             show_mismatches: Number of worst mismatches to display (0 = don't show)
             with_verbatims: Include verbatim text in mismatch display
+            export_mismatches: Path to save mismatches CSV (None = don't export)
         """
         try:
             # Load data
@@ -552,6 +638,10 @@ class CodebookEvaluator:
             # Show mismatches if requested
             if show_mismatches > 0:
                 self.print_mismatches(top_n=show_mismatches, include_verbatims=with_verbatims)
+            
+            # Export mismatches to CSV if requested
+            if export_mismatches:
+                self.save_mismatches_report(export_mismatches)
             
             # Save detailed report
             if save_report:
@@ -594,6 +684,8 @@ Examples:
                        help='Show top N worst mismatched responses (default: 0 = don\'t show)')
     parser.add_argument('--with-verbatims', '-v', action='store_true',
                        help='Include verbatim text when showing mismatches (slower)')
+    parser.add_argument('--export-mismatches', '-e', metavar='FILE', default=None,
+                       help='Export ALL mismatches with verbatims to CSV file (e.g., mismatches.csv)')
     
     args = parser.parse_args()
     
@@ -608,7 +700,8 @@ Examples:
     evaluator.run(
         save_report=not args.no_save,
         show_mismatches=args.show_mismatches,
-        with_verbatims=args.with_verbatims
+        with_verbatims=args.with_verbatims,
+        export_mismatches=args.export_mismatches
     )
 
 

@@ -538,12 +538,17 @@
             <!-- Worst Mismatches -->
             <div class="row g-4 mb-4" id="mismatchSection" style="display: none;">
                 <div class="col-12">
-                    <div class="code-table" style="max-height: 600px;">
-                        <h4 class="mb-3">
-                            <i class="fas fa-exclamation-circle me-2" style="color: #f59e0b;"></i>
-                            <span id="mismatchTitle">Worst Mismatched Responses</span>
-                        </h4>
-                        <div id="worstMismatches"></div>
+                    <div class="code-table" style="max-height: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">
+                                <i class="fas fa-exclamation-circle me-2" style="color: #f59e0b;"></i>
+                                <span id="mismatchTitle">Worst Mismatched Responses</span>
+                            </h4>
+                            <button class="btn btn-sm btn-primary" id="downloadCsvBtn">
+                                <i class="fas fa-download me-2"></i>Download ALL as CSV
+                            </button>
+                        </div>
+                        <div id="worstMismatches" style="max-height: 800px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>
@@ -757,6 +762,20 @@
                     </div>
                 `;
 
+                // Show verbatim text
+                if (mismatch.verbatim && mismatch.verbatim !== 'N/A') {
+                    const displayText = mismatch.verbatim.length > 200 ? 
+                        mismatch.verbatim.substring(0, 200) + '...' : 
+                        mismatch.verbatim;
+                    html += `
+                        <div class="mb-2 p-2" style="background: var(--surface-bg); border-left: 3px solid var(--primary-color); border-radius: 0.25rem;">
+                            <div class="small" style="color: var(--text-secondary); font-style: italic;">
+                                "${displayText}"
+                            </div>
+                        </div>
+                    `;
+                }
+
                 // Show missed codes
                 if (mismatch.missed_codes && mismatch.missed_codes.length > 0) {
                     html += `
@@ -801,6 +820,32 @@
                 container.appendChild(mismatchDiv);
             });
         }
+
+        // CSV Download Handler
+        document.getElementById('downloadCsvBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/download-mismatches');
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert('Download error: ' + (data.error || 'Unknown error'));
+                    return;
+                }
+                
+                // Get filename from header
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'mismatches.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Download failed: ' + error.message);
+            }
+        });
 
         function createMetricsChart(results) {
             const ctx = document.getElementById('metricsChart');
