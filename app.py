@@ -260,20 +260,21 @@ def evaluate():
                 'description': BENCHMARKS[benchmark_id]['description']
             },
             'overall': {
+                # Main evaluation metrics (coded responses only - when benchmark has codes)
+                'coded_only': overall.get('coded_only', {}),
+                # Overall totals for context
                 'n_responses': overall['n_responses'],
                 'n_mismatches': overall.get('n_mismatches', 0),
-                'exact_match_ratio': round(overall['exact_match_ratio'], 4),
-                'jaccard_mean': round(overall['jaccard_mean'], 4),
-                'jaccard_median': round(overall['jaccard_median'], 4),
-                'f1_micro': round(overall['f1_micro'], 4),
-                'f1_macro': round(overall['f1_macro'], 4),
-                'precision_micro': round(overall['precision_micro'], 4),
-                'precision_macro': round(overall['precision_macro'], 4),
-                'recall_micro': round(overall['recall_micro'], 4),
-                'recall_macro': round(overall['recall_macro'], 4),
                 'total_tp': overall['total_tp'],
                 'total_fp': overall['total_fp'],
-                'total_fn': overall['total_fn']
+                'total_fn': overall['total_fn'],
+                # Uncoded classification metrics (separate evaluation)
+                'uncoded_classification': overall.get('uncoded_classification', {}),
+                'uncoded_benchmark': overall.get('uncoded_benchmark', 0),
+                'uncoded_model': overall.get('uncoded_model', 0),
+                'uncoded_both': overall.get('uncoded_both', 0),
+                # Question-level uncoded breakdown
+                'question_uncoded_breakdown': overall.get('question_uncoded_breakdown', [])
             },
             'top_codes': code_performance[:10],
             'bottom_codes': sorted(code_performance, key=lambda x: x['f1'])[:10],

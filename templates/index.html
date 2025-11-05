@@ -16,18 +16,45 @@
     
     <style>
         :root {
-            --primary-color: #3b82f6;
-            --success-color: #22c55e;
+            /* Primary Colors - Elegant Blues */
+            --primary-color: #4f8df5;
+            --primary-light: #7ba6f8;
+            --primary-dark: #3a6fd8;
+            
+            /* Success - Soft Emerald */
+            --success-color: #10b981;
+            --success-light: #34d399;
+            --success-dark: #059669;
+            
+            /* Warning - Warm Amber */
             --warning-color: #f59e0b;
-            --danger-color: #ef4444;
-            --dark-bg: #0a0e1a;
-            --card-bg: #1a1f35;
-            --card-border: #2a3148;
-            --text-primary: #e5e7eb;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
+            --warning-light: #fbbf24;
+            --warning-dark: #d97706;
+            
+            /* Danger - Soft Coral */
+            --danger-color: #f87171;
+            --danger-light: #fca5a5;
+            --danger-dark: #ef4444;
+            
+            /* Accent - Elegant Purple */
+            --accent-purple: #8b5cf6;
+            --accent-purple-light: #a78bfa;
+            --accent-indigo: #6366f1;
+            
+            /* Background - Deep Navy */
+            --dark-bg: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --surface-bg: #172033;
+            
+            /* Text - Soft Grays */
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            
+            /* Accent Blue */
             --accent-blue: #60a5fa;
-            --surface-bg: #141829;
+            --accent-blue-light: #93c5fd;
         }
         
         body {
@@ -338,7 +365,7 @@
         }
         
         .metric-excellent { color: var(--success-color); }
-        .metric-good { color: var(--accent-blue); }
+        .metric-good { color: var(--primary-light); }
         .metric-fair { color: var(--warning-color); }
         .metric-poor { color: var(--danger-color); }
         
@@ -430,7 +457,7 @@
         .error-container {
             animation: fadeInUp 0.4s ease;
             background: var(--card-bg);
-            border: 2px solid #ef4444;
+            border: 2px solid var(--danger-color);
             border-radius: 0.75rem;
             padding: 2rem;
             margin-bottom: 2rem;
@@ -446,10 +473,10 @@
         }
         
         .error-message pre {
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(248, 113, 113, 0.08);
             padding: 1rem;
             border-radius: 0.5rem;
-            border-left: 3px solid #ef4444;
+            border-left: 3px solid var(--danger-color);
             white-space: pre-wrap;
             word-wrap: break-word;
             font-family: 'Courier New', monospace;
@@ -486,7 +513,7 @@
         }
         
         .download-card .btn-success {
-            background: linear-gradient(135deg, var(--success-color) 0%, #16a34a 100%);
+            background: linear-gradient(135deg, var(--success-color) 0%, var(--success-dark) 100%);
             border: none;
             transition: all 0.3s ease;
             padding: 0.875rem 2rem;
@@ -691,26 +718,32 @@
                 </p>
             </div>
 
-            <!-- Primary Metrics Section -->
+            <!-- Main Evaluation: Coding Quality (When Benchmark Has Codes) -->
             <div class="section-group mb-5">
                 <h3 class="section-title mb-4">
-                    <i class="fas fa-star me-2" style="color: var(--warning-color);"></i>Key Performance Indicators
+                    <i class="fas fa-star me-2" style="color: var(--warning-light);"></i>Model Coding Performance
                 </h3>
+                <div class="alert alert-info mb-4" style="background: rgba(79, 141, 245, 0.08); border-left: 3px solid var(--primary-color); border-radius: 0.5rem;">
+                    <i class="fas fa-info-circle me-2" style="color: var(--primary-light);"></i>
+                    <strong style="color: var(--text-primary);">Primary Evaluation:</strong> 
+                    <span style="color: var(--text-secondary);">Metrics below evaluate model performance <strong>only for responses where the benchmark has codes assigned</strong>.
+                    This measures how accurately the model codes responses that should have codes.</span>
+                </div>
                 <div class="row g-4">
                     <div class="col-lg-3 col-md-6">
                         <div class="metric-card metric-primary text-center">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-bullseye fa-2x" style="color: #60a5fa;"></i>
+                                <i class="fas fa-bullseye fa-2x" style="color: var(--primary-light);"></i>
                             </div>
-                            <div class="metric-label">F1-Score (Micro)</div>
+                            <div class="metric-label">F1-Score</div>
                             <div class="metric-value" id="f1Micro">-</div>
-                            <small class="text-muted" id="f1MicroLabel">-</small>
+                            <small class="text-muted" id="f1MicroLabel">Micro-averaged</small>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6">
                         <div class="metric-card metric-primary text-center">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-crosshairs fa-2x" style="color: #34d399;"></i>
+                                <i class="fas fa-crosshairs fa-2x" style="color: var(--success-light);"></i>
                             </div>
                             <div class="metric-label">Precision</div>
                             <div class="metric-value" id="precision">-</div>
@@ -720,7 +753,7 @@
                     <div class="col-lg-3 col-md-6">
                         <div class="metric-card metric-primary text-center">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-clipboard-check fa-2x" style="color: #60a5fa;"></i>
+                                <i class="fas fa-clipboard-check fa-2x" style="color: var(--primary-light);"></i>
                             </div>
                             <div class="metric-label">Recall</div>
                             <div class="metric-value" id="recall">-</div>
@@ -730,7 +763,7 @@
                     <div class="col-lg-3 col-md-6">
                         <div class="metric-card metric-primary text-center">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-check-double fa-2x" style="color: #fbbf24;"></i>
+                                <i class="fas fa-check-double fa-2x" style="color: var(--warning-light);"></i>
                             </div>
                             <div class="metric-label">Exact Match</div>
                             <div class="metric-value" id="exactMatch">-</div>
@@ -738,28 +771,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Secondary Metrics Section -->
-            <div class="section-group mb-5">
-                <h3 class="section-title mb-4">
-                    <i class="fas fa-chart-line me-2" style="color: var(--primary-color);"></i>Additional Metrics
-                </h3>
-                <div class="row g-4">
+                
+                <!-- Secondary Row - Additional Context -->
+                <div class="row g-4 mt-3">
                     <div class="col-lg-4 col-md-6">
-                        <div class="metric-card text-center">
+                        <div class="metric-card text-center" style="border-left: 3px solid var(--text-muted);">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-layer-group fa-2x" style="color: #9ca3af;"></i>
-                            </div>
-                            <div class="metric-label">F1-Score (Macro)</div>
-                            <div class="metric-value" id="f1Macro">-</div>
-                            <small class="text-muted">Per-code average</small>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="metric-card text-center">
-                            <div class="metric-icon-wrapper">
-                                <i class="fas fa-project-diagram fa-2x" style="color: #9ca3af;"></i>
+                                <i class="fas fa-project-diagram fa-2x" style="color: var(--text-muted);"></i>
                             </div>
                             <div class="metric-label">Jaccard Similarity</div>
                             <div class="metric-value" id="jaccard">-</div>
@@ -767,15 +785,139 @@
                         </div>
                     </div>
                     <div class="col-lg-4 col-md-6">
-                        <div class="metric-card text-center">
+                        <div class="metric-card text-center" style="border-left: 3px solid var(--text-muted);">
                             <div class="metric-icon-wrapper">
-                                <i class="fas fa-list-ol fa-2x" style="color: #9ca3af;"></i>
+                                <i class="fas fa-list-ol fa-2x" style="color: var(--text-muted);"></i>
                             </div>
-                            <div class="metric-label">Total Responses</div>
-                            <div class="metric-value" id="nResponses">-</div>
-                            <small class="text-muted">Evaluated</small>
+                            <div class="metric-label">Coded Responses</div>
+                            <div class="metric-value" id="nCodedResponses">-</div>
+                            <small class="text-muted">Where benchmark has codes</small>
                         </div>
                     </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="metric-card text-center" style="border-left: 3px solid var(--text-muted);">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-layer-group fa-2x" style="color: var(--text-muted);"></i>
+                            </div>
+                            <div class="metric-label">F1-Score (Macro)</div>
+                            <div class="metric-value" id="f1Macro">-</div>
+                            <small class="text-muted">Per-code average</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uncoded Classification Performance (Separate Evaluation) -->
+            <div class="section-group mb-5" id="uncodedClassificationSection" style="display: none;">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-question-circle me-2" style="color: var(--warning-light);"></i>Uncoded Classification Performance
+                </h3>
+                <div class="alert alert-warning mb-4" style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--warning-color); border-radius: 0.5rem;">
+                    <i class="fas fa-info-circle me-2" style="color: var(--warning-light);"></i>
+                    <strong style="color: var(--text-primary);">Separate Evaluation:</strong> 
+                    <span style="color: var(--text-secondary);">This measures how well the model identifies when responses should have <strong>no codes assigned</strong>.
+                    This is evaluated separately from coding quality above.</span>
+                </div>
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card text-center" style="border-left: 4px solid var(--success-color);">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-check-circle fa-2x" style="color: var(--success-light);"></i>
+                            </div>
+                            <div class="metric-label">Overlap</div>
+                            <div class="metric-value" id="uncodedOverlapCount">0</div>
+                            <small class="text-muted" id="uncodedOverlapPct">0%</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card text-center" style="border-left: 4px solid var(--primary-color);">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-bullseye fa-2x" style="color: var(--primary-light);"></i>
+                            </div>
+                            <div class="metric-label">Classification Accuracy</div>
+                            <div class="metric-value" id="uncodedClassificationAccuracy">-</div>
+                            <small class="text-muted">Correctly identified as uncoded</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card text-center" style="border-left: 4px solid var(--danger-color);">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--danger-light);"></i>
+                            </div>
+                            <div class="metric-label">Incorrectly Coded</div>
+                            <div class="metric-value" id="incorrectlyCodedCount">0</div>
+                            <small class="text-muted">Model coded when shouldn't</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="metric-card text-center" style="border-left: 4px solid var(--warning-color);">
+                            <div class="metric-icon-wrapper">
+                                <i class="fas fa-file-alt fa-2x" style="color: var(--warning-light);"></i>
+                            </div>
+                            <div class="metric-label">Benchmark Uncoded</div>
+                            <div class="metric-value" id="uncodedBenchmarkTotal">0</div>
+                            <small class="text-muted">Total uncoded cases</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Show examples of incorrectly coded responses -->
+                <div id="incorrectlyCodedExamples" class="mt-4" style="display: none;">
+                    <h5 class="mb-3" style="color: var(--text-primary);">
+                        <i class="fas fa-list me-2"></i>Examples: Responses Incorrectly Coded (Model assigned codes when benchmark is uncoded)
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm" style="background: var(--card-bg); font-size: 0.9rem;">
+                            <thead style="background: rgba(248, 113, 113, 0.08);">
+                                <tr>
+                                    <th>Respondent ID</th>
+                                    <th>Question ID</th>
+                                    <th>Assigned Codes</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incorrectlyCodedTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question-Level Uncoded Breakdown Section -->
+            <div class="section-group mb-5" id="questionUncodedSection" style="display: none;">
+                <h3 class="section-title mb-4">
+                    <i class="fas fa-table me-2" style="color: var(--accent-indigo);"></i>Question-Level Uncoded Breakdown
+                </h3>
+                <div class="alert alert-info mb-3" style="background: rgba(99, 102, 241, 0.08); border-left: 3px solid var(--accent-indigo); border-radius: 0.5rem;">
+                    <i class="fas fa-info-circle me-2" style="color: var(--accent-purple-light);"></i>
+                    <strong style="color: var(--text-primary);">Overlap Analysis:</strong> 
+                    <span style="color: var(--text-secondary);">Shows how many responses are uncoded in both benchmark and model output for each question.
+                    Higher overlap indicates better agreement on which responses should remain uncoded.</span>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover" style="background: var(--card-bg); border-radius: 0.5rem; overflow: hidden; border-collapse: separate; border-spacing: 0;">
+                        <thead style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-bottom: 2px solid var(--card-border);">
+                            <tr>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;">Question ID</th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Total</th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: var(--warning-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);">Benchmark<br/>Uncoded</span>
+                                </th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: var(--danger-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(248, 113, 113, 0.2);">Model<br/>Uncoded</span>
+                                </th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: var(--success-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">Both<br/>Uncoded</span>
+                                </th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Overlap %</th>
+                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Accuracy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="questionUncodedTableBody">
+                            <!-- Table rows will be populated by JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -853,7 +995,7 @@
                     <div class="col-lg-6">
                         <div class="code-table">
                             <div class="d-flex align-items-center mb-3">
-                                <i class="fas fa-arrow-up me-2" style="color: #34d399; font-size: 1.25rem;"></i>
+                                <i class="fas fa-arrow-up me-2" style="color: var(--success-light); font-size: 1.25rem;"></i>
                                 <h4 class="mb-0">Top 10 Performing Codes</h4>
                             </div>
                             <div id="topCodes"></div>
@@ -1072,21 +1214,21 @@
             
             // Build error HTML with better styling
             let errorHtml = `
-                <div class="error-container" style="background: var(--card-bg); border: 2px solid #ef4444; border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem;">
+                <div class="error-container" style="background: var(--card-bg); border: 2px solid var(--danger-color); border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem;">
                     <div class="d-flex align-items-start mb-3">
-                        <div class="error-icon me-3" style="font-size: 2rem; color: #ef4444;">
+                        <div class="error-icon me-3" style="font-size: 2rem; color: var(--danger-color);">
                             <i class="fas fa-exclamation-triangle"></i>
                         </div>
                         <div style="flex: 1;">
-                            <h3 class="mb-2" style="color: #ef4444; font-weight: 600;">
+                            <h3 class="mb-2" style="color: var(--danger-color); font-weight: 600;">
                                 ${title}
                             </h3>
                             <div class="error-message" style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
-                                ${message.includes('\n') ? `<pre style="white-space: pre-wrap; font-size: 0.9rem; background: rgba(239, 68, 68, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #ef4444;">${message}</pre>` : message}
+                                ${message.includes('\n') ? `<pre style="white-space: pre-wrap; font-size: 0.9rem; background: rgba(248, 113, 113, 0.08); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid var(--danger-color);">${message}</pre>` : message}
                             </div>
                             ${suggestion ? `
-                                <div class="error-suggestion" style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 1rem; border-radius: 0.25rem; margin-top: 1rem;">
-                                    <strong style="color: #fbbf24;"><i class="fas fa-lightbulb me-2"></i>Suggestion:</strong>
+                                <div class="error-suggestion" style="background: rgba(251, 191, 36, 0.08); border-left: 3px solid var(--warning-light); padding: 1rem; border-radius: 0.25rem; margin-top: 1rem;">
+                                    <strong style="color: var(--warning-light);"><i class="fas fa-lightbulb me-2"></i>Suggestion:</strong>
                                     <div style="color: var(--text-secondary); margin-top: 0.5rem;">${suggestion}</div>
                                 </div>
                             ` : ''}
@@ -1116,15 +1258,225 @@
             const results = data.overall;
             
             try {
-                // Update metric cards
-                if (results.f1_micro !== undefined) updateMetric('f1Micro', results.f1_micro, 'f1MicroLabel');
-                if (results.precision_micro !== undefined) updateMetric('precision', results.precision_micro);
-                if (results.recall_micro !== undefined) updateMetric('recall', results.recall_micro);
-                if (results.exact_match_ratio !== undefined) updateMetric('exactMatch', results.exact_match_ratio, null, true);
+                // Update main evaluation metrics (coded responses only)
+                const codedOnly = results.coded_only || {};
+                
+                if (codedOnly.f1_micro !== undefined) updateMetric('f1Micro', codedOnly.f1_micro, 'f1MicroLabel');
+                if (codedOnly.precision_micro !== undefined) updateMetric('precision', codedOnly.precision_micro);
+                if (codedOnly.recall_micro !== undefined) updateMetric('recall', codedOnly.recall_micro);
+                if (codedOnly.exact_match_ratio !== undefined) updateMetric('exactMatch', codedOnly.exact_match_ratio, null, true);
+                if (codedOnly.jaccard_mean !== undefined) updateMetric('jaccard', codedOnly.jaccard_mean);
+                if (codedOnly.n_responses !== undefined) {
+                    document.getElementById('nCodedResponses').textContent = codedOnly.n_responses.toLocaleString();
+                }
+                
+                // F1 Macro (using overall since it's per-code)
                 if (results.f1_macro !== undefined) updateMetric('f1Macro', results.f1_macro);
-                if (results.jaccard_mean !== undefined) updateMetric('jaccard', results.jaccard_mean);
+                
+                // Total responses for context
                 if (results.n_responses !== undefined) {
-                    document.getElementById('nResponses').textContent = results.n_responses.toLocaleString();
+                    const nResponsesEl = document.getElementById('nResponses');
+                    if (nResponsesEl) {
+                        nResponsesEl.textContent = results.n_responses.toLocaleString();
+                    }
+                }
+
+                // Display new metrics
+                if (results.f1_macro_weighted !== undefined) updateMetric('f1MacroWeighted', results.f1_macro_weighted);
+                if (results.hamming_loss !== undefined) {
+                    const hammingLossEl = document.getElementById('hammingLoss');
+                    if (hammingLossEl) {
+                        hammingLossEl.textContent = results.hamming_loss.toFixed(4);
+                        hammingLossEl.style.color = results.hamming_loss < 0.1 ? 'var(--success-color)' : (results.hamming_loss < 0.3 ? 'var(--warning-color)' : 'var(--danger-color)');
+                    }
+                }
+
+                // Display coded responses only metrics
+                if (results.coded_only && results.coded_only.n_responses > 0) {
+                    const codedSection = document.getElementById('codedOnlySection');
+                    const coded = results.coded_only;
+                    
+                    if (codedSection) {
+                        codedSection.style.display = 'block';
+                        
+                        if (coded.exact_match_ratio !== undefined) {
+                            const exactMatchEl = document.getElementById('codedExactMatch');
+                            if (exactMatchEl) {
+                                exactMatchEl.textContent = (coded.exact_match_ratio * 100).toFixed(1) + '%';
+                            }
+                        }
+                        
+                        if (coded.n_responses !== undefined) {
+                            const nResponsesEl = document.getElementById('codedNResponses');
+                            if (nResponsesEl) {
+                                nResponsesEl.textContent = `${coded.n_responses.toLocaleString()} coded responses`;
+                            }
+                        }
+                        
+                        if (coded.jaccard_mean !== undefined) updateMetric('codedJaccard', coded.jaccard_mean);
+                        if (coded.f1_micro !== undefined) updateMetric('codedF1', coded.f1_micro);
+                        if (coded.precision_micro !== undefined) updateMetric('codedPrecision', coded.precision_micro);
+                    }
+                } else {
+                    const codedSection = document.getElementById('codedOnlySection');
+                    if (codedSection) codedSection.style.display = 'none';
+                }
+
+                // Display uncoded classification performance (separate evaluation)
+                const uncodedClfSection = document.getElementById('uncodedClassificationSection');
+                if (results.uncoded_classification && results.uncoded_classification.total_cases > 0) {
+                    const uncodedClf = results.uncoded_classification;
+                    
+                    if (uncodedClfSection) {
+                        uncodedClfSection.style.display = 'block';
+                        
+                        // Overlap
+                        if (uncodedClf.overlap_count !== undefined) {
+                            document.getElementById('uncodedOverlapCount').textContent = uncodedClf.overlap_count.toLocaleString();
+                        }
+                        if (uncodedClf.overlap_percentage !== undefined) {
+                            document.getElementById('uncodedOverlapPct').textContent = uncodedClf.overlap_percentage.toFixed(1) + '%';
+                        }
+                        
+                        // Classification accuracy
+                        if (uncodedClf.accuracy !== undefined) {
+                            updateMetric('uncodedClassificationAccuracy', uncodedClf.accuracy);
+                        }
+                        
+                        // Incorrectly coded (model coded when shouldn't)
+                        if (uncodedClf.false_positives !== undefined) {
+                            document.getElementById('incorrectlyCodedCount').textContent = uncodedClf.false_positives.toLocaleString();
+                        }
+                        
+                        // Total benchmark uncoded
+                        if (uncodedClf.total_cases !== undefined) {
+                            document.getElementById('uncodedBenchmarkTotal').textContent = uncodedClf.total_cases.toLocaleString();
+                        }
+                        
+                        // Show examples of incorrectly coded responses
+                        if (uncodedClf.incorrectly_coded_responses && uncodedClf.incorrectly_coded_responses.length > 0) {
+                            const examplesDiv = document.getElementById('incorrectlyCodedExamples');
+                            const tableBody = document.getElementById('incorrectlyCodedTableBody');
+                            
+                            if (examplesDiv && tableBody) {
+                                examplesDiv.style.display = 'block';
+                                tableBody.innerHTML = '';
+                                
+                                uncodedClf.incorrectly_coded_responses.slice(0, 10).forEach(item => {
+                                    const row = document.createElement('tr');
+                                    row.innerHTML = `
+                                        <td>${item.respondent_id}</td>
+                                        <td>${item.question_id}</td>
+                                        <td><span class="badge bg-warning text-dark">${item.assigned_codes.join(', ')}</span></td>
+                                        <td class="text-center">${item.assigned_code_count}</td>
+                                    `;
+                                    tableBody.appendChild(row);
+                                });
+                                
+                                if (uncodedClf.incorrectly_coded_responses.length > 10) {
+                                    const row = document.createElement('tr');
+                                    row.innerHTML = `
+                                        <td colspan="4" class="text-center text-muted">
+                                            ... and ${uncodedClf.incorrectly_coded_responses.length - 10} more (see CSV for full list)
+                                        </td>
+                                    `;
+                                    tableBody.appendChild(row);
+                                }
+                            }
+                        }
+                    }
+                } else if (uncodedClfSection) {
+                    uncodedClfSection.style.display = 'none';
+                }
+
+                // Display question-level uncoded breakdown
+                if (results.question_uncoded_breakdown && results.question_uncoded_breakdown.length > 0) {
+                    // Filter to only show questions with uncoded responses
+                    const questionsWithUncoded = results.question_uncoded_breakdown.filter(q => 
+                        q.benchmark_uncoded > 0 || q.model_uncoded > 0 || q.both_uncoded > 0
+                    );
+                    
+                    const questionSection = document.getElementById('questionUncodedSection');
+                    const tableBody = document.getElementById('questionUncodedTableBody');
+                    
+                    if (questionSection && tableBody) {
+                        if (questionsWithUncoded.length > 0) {
+                            // Show section if there are questions with uncoded responses
+                            questionSection.style.display = 'block';
+                            tableBody.innerHTML = '';
+                            const noUncodedMsg = document.getElementById('noUncodedMessage');
+                            if (noUncodedMsg) noUncodedMsg.style.display = 'none';
+                            
+                            questionsWithUncoded.forEach((q, idx) => {
+                                const row = document.createElement('tr');
+                                row.style.borderBottom = '1px solid var(--card-border)';
+                                
+                                // Highlight rows with high overlap
+                                const overlapPct = q.overlap_percentage || 0;
+                                if (overlapPct >= 80 && q.both_uncoded > 0) {
+                                    row.style.background = 'rgba(16, 185, 129, 0.04)';
+                                } else if (overlapPct < 50 && (q.benchmark_uncoded > 0 || q.model_uncoded > 0)) {
+                                    row.style.background = 'rgba(248, 113, 113, 0.04)';
+                                }
+                                
+                                // Calculate accuracy color - only if there are benchmark uncoded to calculate from
+                                const accuracyColor = q.benchmark_uncoded > 0 ? 
+                                    (q.classification_accuracy >= 0.8 ? 'var(--success-color)' : 
+                                     (q.classification_accuracy >= 0.5 ? 'var(--warning-color)' : 'var(--danger-color)')) : 
+                                    'var(--text-secondary)';
+                                
+                                const accuracyDisplay = q.benchmark_uncoded > 0 ? 
+                                    `${(q.classification_accuracy * 100).toFixed(1)}%` : 
+                                    'N/A';
+                                
+                                row.innerHTML = `
+                                    <td style="font-weight: 500; color: var(--text-primary);">
+                                        <strong>${q.question_id}</strong>
+                                    </td>
+                                    <td class="text-center" style="color: var(--text-secondary);">
+                                        ${q.total_responses}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge" style="background: var(--warning-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                            ${q.benchmark_uncoded}
+                                            <small>(${q.benchmark_uncoded_percentage.toFixed(1)}%)</small>
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge" style="background: var(--danger-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                            ${q.model_uncoded}
+                                            <small>(${q.model_uncoded_percentage.toFixed(1)}%)</small>
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge" style="background: var(--success-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                            ${q.both_uncoded}
+                                        </span>
+                                    </td>
+                                <td class="text-center" style="font-weight: 600; color: ${overlapPct >= 80 ? 'var(--success-color)' : (overlapPct < 50 && overlapPct > 0 ? 'var(--danger-color)' : 'var(--warning-color)')};">
+                                    ${overlapPct.toFixed(1)}%
+                                </td>
+                                `;
+                                
+                                tableBody.appendChild(row);
+                            });
+                        } else {
+                            // No uncoded responses found - show message and hide table
+                            questionSection.style.display = 'block';
+                            tableBody.innerHTML = '';
+                            const noUncodedMsg = document.getElementById('noUncodedMessage');
+                            if (noUncodedMsg) noUncodedMsg.style.display = 'block';
+                        }
+                    }
+                } else {
+                    const questionSection = document.getElementById('questionUncodedSection');
+                    const noUncodedMsg = document.getElementById('noUncodedMessage');
+                    if (questionSection) {
+                        questionSection.style.display = 'none';
+                    }
+                    if (noUncodedMsg) {
+                        noUncodedMsg.style.display = 'none';
+                    }
                 }
 
                 // Display top/bottom codes

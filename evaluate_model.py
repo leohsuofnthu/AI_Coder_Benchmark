@@ -313,6 +313,34 @@ class CodebookEvaluator:
         exact_matches = 0
         jaccard_scores = []
         
+        # Track uncoded responses
+        uncoded_benchmark = 0  # Responses with no codes in benchmark
+        uncoded_model = 0  # Responses with no codes in model output
+        uncoded_both = 0  # Responses with no codes in both
+        
+        # Track uncoded responses by question
+        question_uncoded_stats = defaultdict(lambda: {
+            'benchmark_uncoded': 0,
+            'model_uncoded': 0,
+            'both_uncoded': 0,
+            'total_responses': 0,
+            'uncoded_responses': []  # List of (respondent_id, verbatim, status)
+        })
+        
+        # Separate counters for coded responses only (ONLY when benchmark has codes)
+        # This is the main evaluation metric - how well does model code responses that should have codes?
+        coded_tp = 0
+        coded_fp = 0
+        coded_fn = 0
+        coded_exact_matches = 0
+        coded_jaccard_scores = []
+        n_coded_responses = 0  # Responses where benchmark has codes (main evaluation set)
+        
+        # Track uncoded classification errors
+        # When benchmark is uncoded but model assigned codes (False Positive for uncoded classification)
+        incorrectly_coded_count = 0  # Benchmark uncoded but model coded (model should not have coded)
+        incorrectly_coded_responses = []  # List of (respondent_id, question_id, assigned_codes)
+        
         # Per-response metrics
         response_metrics = []
         
@@ -323,6 +351,45 @@ class CodebookEvaluator:
         code_stats = defaultdict(lambda: {'tp': 0, 'fp': 0, 'fn': 0, 'support': 0})
         
         for key, ground_truth, predicted in aligned_data:
+            respondent_id, question_id = key
+            
+            # Track uncoded responses
+            is_benchmark_uncoded = len(ground_truth) == 0
+            is_model_uncoded = len(predicted) == 0
+            
+            # Update question-level statistics
+            question_uncoded_stats[question_id]['total_responses'] += 1
+            
+            if is_benchmark_uncoded:
+                uncoded_benchmark += 1
+                question_uncoded_stats[question_id]['benchmark_uncoded'] += 1
+            if is_model_uncoded:
+                uncoded_model += 1
+                question_uncoded_stats[question_id]['model_uncoded'] += 1
+            if is_benchmark_uncoded and is_model_uncoded:
+                uncoded_both += 1
+                question_uncoded_stats[question_id]['both_uncoded'] += 1
+                
+                # Track this uncoded response
+                question_uncoded_stats[question_id]['uncoded_responses'].append({
+                    'respondent_id': respondent_id,
+                    'status': 'both_uncoded'  # Correctly identified as uncoded
+                })
+            elif is_benchmark_uncoded and not is_model_uncoded:
+                # Benchmark uncoded but model assigned codes (error)
+                question_uncoded_stats[question_id]['uncoded_responses'].append({
+                    'respondent_id': respondent_id,
+                    'status': 'incorrectly_coded',  # Model incorrectly assigned codes
+                    'assigned_codes': list(predicted)
+                })
+            elif not is_benchmark_uncoded and is_model_uncoded:
+                # Model uncoded but benchmark has codes (missed codes)
+                question_uncoded_stats[question_id]['uncoded_responses'].append({
+                    'respondent_id': respondent_id,
+                    'status': 'missed_codes',  # Model missed codes that should be assigned
+                    'missed_codes': list(ground_truth)
+                })
+            
             # Response-level calculations
             tp = len(ground_truth & predicted)  # Intersection
             fp = len(predicted - ground_truth)  # Predicted but not actual
@@ -340,6 +407,32 @@ class CodebookEvaluator:
             union = len(ground_truth | predicted)
             jaccard = tp / union if union > 0 else 1.0  # 1.0 if both empty
             jaccard_scores.append(jaccard)
+            
+            # Separate metrics for coded responses only (ONLY when benchmark has codes)
+            # This is the main evaluation - how well does model code responses that should have codes?
+            if not is_benchmark_uncoded:  # Benchmark has codes - this is what we evaluate
+                n_coded_responses += 1
+                coded_tp += tp
+                coded_fp += fp
+                coded_fn += fn
+                
+                if ground_truth == predicted:
+                    coded_exact_matches += 1
+                
+                # Jaccard for coded responses
+                coded_jaccard = tp / union if union > 0 else 0.0
+                coded_jaccard_scores.append(coded_jaccard)
+            
+            # Track uncoded classification errors
+            # When benchmark is uncoded but model assigned codes (this is an error)
+            if is_benchmark_uncoded and not is_model_uncoded:
+                incorrectly_coded_count += 1
+                incorrectly_coded_responses.append({
+                    'respondent_id': respondent_id,
+                    'question_id': question_id,
+                    'assigned_codes': list(predicted),
+                    'assigned_code_count': len(predicted)
+                })
             
             # Per-code statistics
             for code in ground_truth:
@@ -411,6 +504,87 @@ class CodebookEvaluator:
         recall_macro = sum(code_recalls) / len(code_recalls) if code_recalls else 0
         f1_macro = sum(code_f1s) / len(code_f1s) if code_f1s else 0
         
+        # Support-weighted macro averaging (weight by code frequency)
+        total_support = sum(stats['support'] for stats in code_stats.values())
+        weighted_precision_macro = 0
+        weighted_recall_macro = 0
+        weighted_f1_macro = 0
+        
+        if total_support > 0:
+            for code, stats in code_stats.items():
+                tp = stats['tp']
+                fp = stats['fp']
+                fn = stats['fn']
+                support = stats['support']
+                
+                prec = tp / (tp + fp) if (tp + fp) > 0 else 0
+                rec = tp / (tp + fn) if (tp + fn) > 0 else 0
+                f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0
+                
+                weight = support / total_support
+                weighted_precision_macro += prec * weight
+                weighted_recall_macro += rec * weight
+                weighted_f1_macro += f1 * weight
+        
+        # Hamming Loss: average fraction of labels that are incorrectly predicted
+        # Formula: (FP + FN) / (n_responses * n_codes)
+        n_codes = len(code_stats)
+        hamming_loss = (total_fp + total_fn) / (n_responses * n_codes) if (n_responses > 0 and n_codes > 0) else 0
+        
+        # Separate metrics for coded responses only
+        coded_precision_micro = coded_tp / (coded_tp + coded_fp) if (coded_tp + coded_fp) > 0 else 0
+        coded_recall_micro = coded_tp / (coded_tp + coded_fn) if (coded_tp + coded_fn) > 0 else 0
+        coded_f1_micro = 2 * (coded_precision_micro * coded_recall_micro) / (coded_precision_micro + coded_recall_micro) \
+                        if (coded_precision_micro + coded_recall_micro) > 0 else 0
+        coded_exact_match_ratio = coded_exact_matches / n_coded_responses if n_coded_responses > 0 else 0
+        coded_jaccard_mean = sum(coded_jaccard_scores) / len(coded_jaccard_scores) if coded_jaccard_scores else 0
+        
+        # Uncoded classification metrics (how well does model identify when nothing should be coded?)
+        # This is separate from coding quality - it's about identifying when to NOT code
+        uncoded_classification_tp = uncoded_both  # Both correctly uncoded (correctly identified as uncoded)
+        uncoded_classification_fp = incorrectly_coded_count  # Benchmark uncoded but model coded (should NOT have coded)
+        uncoded_classification_fn = uncoded_model - uncoded_both  # Model uncoded but benchmark has codes (missed codes - already counted in coded metrics)
+        uncoded_classification_total = uncoded_benchmark  # Total cases where benchmark is uncoded
+        
+        # Accuracy: When benchmark is uncoded, did model also leave it uncoded?
+        uncoded_classification_accuracy = (uncoded_classification_tp / uncoded_classification_total) if uncoded_classification_total > 0 else 0
+        
+        # Overlap: How many responses are uncoded in both (agreement)
+        uncoded_overlap_count = uncoded_both
+        uncoded_overlap_percentage = (uncoded_both / uncoded_benchmark * 100) if uncoded_benchmark > 0 else 0
+        
+        # Calculate question-level uncoded statistics
+        question_uncoded_summary = []
+        for question_id, stats in question_uncoded_stats.items():
+            total = stats['total_responses']
+            if total > 0:
+                # Calculate overlap percentage
+                overlap_pct = (stats['both_uncoded'] / total * 100) if total > 0 else 0
+                benchmark_uncoded_pct = (stats['benchmark_uncoded'] / total * 100) if total > 0 else 0
+                model_uncoded_pct = (stats['model_uncoded'] / total * 100) if total > 0 else 0
+                
+                # Classification accuracy for this question (when benchmark is uncoded, did model also leave uncoded?)
+                question_uncoded_tp = stats['both_uncoded']
+                question_uncoded_total = stats['benchmark_uncoded']
+                question_uncoded_acc = (question_uncoded_tp / question_uncoded_total) if question_uncoded_total > 0 else 0
+                
+                question_uncoded_summary.append({
+                    'question_id': question_id,
+                    'total_responses': total,
+                    'benchmark_uncoded': stats['benchmark_uncoded'],
+                    'model_uncoded': stats['model_uncoded'],
+                    'both_uncoded': stats['both_uncoded'],
+                    'overlap_count': stats['both_uncoded'],
+                    'overlap_percentage': overlap_pct,
+                    'benchmark_uncoded_percentage': benchmark_uncoded_pct,
+                    'model_uncoded_percentage': model_uncoded_pct,
+                    'classification_accuracy': question_uncoded_acc,
+                    'uncoded_responses': stats['uncoded_responses']
+                })
+        
+        # Sort by total uncoded responses (descending)
+        question_uncoded_summary.sort(key=lambda x: x['benchmark_uncoded'] + x['model_uncoded'], reverse=True)
+        
         # Sort mismatches by error count (worst first)
         mismatches.sort(key=lambda x: x['error_count'], reverse=True)
         
@@ -428,9 +602,41 @@ class CodebookEvaluator:
                 'precision_macro': precision_macro,
                 'recall_macro': recall_macro,
                 'f1_macro': f1_macro,
+                'precision_macro_weighted': weighted_precision_macro,
+                'recall_macro_weighted': weighted_recall_macro,
+                'f1_macro_weighted': weighted_f1_macro,
+                'hamming_loss': hamming_loss,
                 'total_tp': total_tp,
                 'total_fp': total_fp,
                 'total_fn': total_fn,
+                'uncoded_benchmark': uncoded_benchmark,
+                'uncoded_model': uncoded_model,
+                'uncoded_both': uncoded_both,
+                # Separate metrics for coded responses only
+                'coded_only': {
+                    'n_responses': n_coded_responses,
+                    'exact_match_ratio': coded_exact_match_ratio,
+                    'jaccard_mean': coded_jaccard_mean,
+                    'precision_micro': coded_precision_micro,
+                    'recall_micro': coded_recall_micro,
+                    'f1_micro': coded_f1_micro,
+                    'total_tp': coded_tp,
+                    'total_fp': coded_fp,
+                    'total_fn': coded_fn,
+                },
+                # Uncoded classification metrics (separate from coding quality)
+                'uncoded_classification': {
+                    'accuracy': uncoded_classification_accuracy,
+                    'true_positives': uncoded_classification_tp,  # Both correctly uncoded
+                    'false_positives': uncoded_classification_fp,  # Model coded when shouldn't (incorrectly_coded_count)
+                    'false_negatives': uncoded_classification_fn,  # Model uncoded when should have codes (already in coded metrics)
+                    'total_cases': uncoded_classification_total,  # Total benchmark uncoded
+                    'overlap_count': uncoded_overlap_count,
+                    'overlap_percentage': uncoded_overlap_percentage,
+                    'incorrectly_coded_responses': incorrectly_coded_responses[:20]  # Top 20 for display
+                },
+                # Question-level uncoded breakdown
+                'question_uncoded_breakdown': question_uncoded_summary,
             },
             'per_code': code_stats,
             'per_response': response_metrics,
@@ -460,9 +666,54 @@ class CodebookEvaluator:
         print(f"Recall (Macro):         {overall['recall_macro']:.4f}")
         print(f"F1-Score (Macro):       {overall['f1_macro']:.4f}")
         print()
+        print(f"Precision (Macro-Weighted): {overall.get('precision_macro_weighted', 0):.4f}")
+        print(f"Recall (Macro-Weighted):    {overall.get('recall_macro_weighted', 0):.4f}")
+        print(f"F1-Score (Macro-Weighted):  {overall.get('f1_macro_weighted', 0):.4f}")
+        print()
+        print(f"Hamming Loss:           {overall.get('hamming_loss', 0):.4f}")
+        print()
         print(f"True Positives:         {overall['total_tp']}")
         print(f"False Positives:        {overall['total_fp']}")
         print(f"False Negatives:        {overall['total_fn']}")
+        
+        # Main evaluation metrics (coded responses only - when benchmark has codes)
+        if 'coded_only' in overall and overall['coded_only']['n_responses'] > 0:
+            coded = overall['coded_only']
+            print(f"\n📊 MAIN EVALUATION - CODED RESPONSES (n={coded['n_responses']})")
+            print("   (Evaluating model performance when benchmark has codes)")
+            print("-" * 70)
+            print(f"Exact Match Ratio:      {coded['exact_match_ratio']:.2%}")
+            print(f"Jaccard Similarity:     {coded['jaccard_mean']:.4f}")
+            print(f"Precision (Micro):      {coded['precision_micro']:.4f}")
+            print(f"Recall (Micro):         {coded['recall_micro']:.4f}")
+            print(f"F1-Score (Micro):       {coded['f1_micro']:.4f}")
+        
+        # Uncoded responses statistics
+        if 'uncoded_benchmark' in overall or 'uncoded_model' in overall:
+            print(f"\n📋 UNCODED RESPONSES")
+            print("-" * 70)
+            uncoded_bench = overall.get('uncoded_benchmark', 0)
+            uncoded_model = overall.get('uncoded_model', 0)
+            uncoded_both = overall.get('uncoded_both', 0)
+            
+            if uncoded_bench > 0:
+                print(f"Benchmark uncoded:      {uncoded_bench} ({uncoded_bench/overall['n_responses']*100:.1f}%)")
+            if uncoded_model > 0:
+                print(f"Model output uncoded:   {uncoded_model} ({uncoded_model/overall['n_responses']*100:.1f}%)")
+            if uncoded_both > 0:
+                print(f"Both uncoded (perfect): {uncoded_both} ({uncoded_both/overall['n_responses']*100:.1f}%)")
+            
+            # Uncoded classification metrics (separate evaluation)
+            if 'uncoded_classification' in overall and overall['uncoded_classification']['total_cases'] > 0:
+                uncoded_clf = overall['uncoded_classification']
+                print(f"\n📋 UNCODED CLASSIFICATION PERFORMANCE")
+                print("   (Separate evaluation: How well model identifies uncoded responses)")
+                print("-" * 70)
+                print(f"Total Benchmark Uncoded:    {uncoded_clf['total_cases']}")
+                print(f"Both Uncoded (Correct):     {uncoded_clf['true_positives']} ({uncoded_clf['overlap_percentage']:.1f}% overlap)")
+                print(f"Incorrectly Coded (Error):  {uncoded_clf['false_positives']} (Model coded when shouldn't)")
+                print(f"Classification Accuracy:    {uncoded_clf['accuracy']:.2%}")
+                print(f"  (When benchmark is uncoded, did model also leave it uncoded?)")
         
         # Top performing codes
         print(f"\n🎯 TOP 10 BEST PERFORMING CODES (by F1-Score)")
