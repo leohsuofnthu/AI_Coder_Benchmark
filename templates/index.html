@@ -768,7 +768,7 @@
                             </div>
                             <div class="metric-label">F1-Score</div>
                             <div class="metric-value" id="f1Micro">-</div>
-                            <small class="text-muted" id="f1MicroLabel">Micro-averaged</small>
+                            <small class="text-muted" id="f1MicroLabel">Micro-averaged • Overall performance</small>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6">
@@ -778,7 +778,7 @@
                             </div>
                             <div class="metric-label">Precision</div>
                             <div class="metric-value" id="precision">-</div>
-                            <small class="text-muted">Micro-averaged</small>
+                            <small class="text-muted">Micro-averaged • Indicator for overcoding</small>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6">
@@ -788,7 +788,7 @@
                             </div>
                             <div class="metric-label">Recall</div>
                             <div class="metric-value" id="recall">-</div>
-                            <small class="text-muted">Micro-averaged</small>
+                            <small class="text-muted">Micro-averaged • Indicator for undercoding</small>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6">
@@ -798,7 +798,7 @@
                             </div>
                             <div class="metric-label">Exact Match</div>
                             <div class="metric-value" id="exactMatch">-</div>
-                            <small class="text-muted">Perfect predictions</small>
+                            <small class="text-muted">Perfect predictions • All codes match exactly</small>
                         </div>
                     </div>
                 </div>
@@ -812,7 +812,7 @@
                             </div>
                             <div class="metric-label">Jaccard Similarity</div>
                             <div class="metric-value" id="jaccard">-</div>
-                            <small class="text-muted">Average overlap</small>
+                            <small class="text-muted">Average overlap • Code overlap ratio</small>
                         </div>
                     </div>
                     <div class="col-lg-4 col-md-6">
@@ -832,7 +832,7 @@
                             </div>
                             <div class="metric-label">F1-Score (Macro)</div>
                             <div class="metric-value" id="f1Macro">-</div>
-                            <small class="text-muted">Per-code average</small>
+                            <small class="text-muted">Per-code average • Equal weight to all codes</small>
                         </div>
                     </div>
                 </div>
@@ -1817,10 +1817,24 @@
 
             if (labelId) {
                 const label = document.getElementById(labelId);
-                if (value >= 0.75) label.textContent = 'Excellent';
-                else if (value >= 0.60) label.textContent = 'Good';
-                else if (value >= 0.40) label.textContent = 'Fair';
-                else label.textContent = 'Needs Improvement';
+                const originalText = label.getAttribute('data-original') || label.textContent;
+                if (!label.getAttribute('data-original')) {
+                    label.setAttribute('data-original', originalText);
+                }
+                
+                let qualityText = '';
+                if (value >= 0.75) qualityText = 'Excellent';
+                else if (value >= 0.60) qualityText = 'Good';
+                else if (value >= 0.40) qualityText = 'Fair';
+                else qualityText = 'Needs Improvement';
+                
+                // Preserve the original indicator text (everything after the bullet)
+                const parts = originalText.split(' • ');
+                if (parts.length > 1) {
+                    label.textContent = `${qualityText} • ${parts.slice(1).join(' • ')}`;
+                } else {
+                    label.textContent = qualityText;
+                }
             }
         }
 
