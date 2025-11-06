@@ -52,12 +52,31 @@ class HierarchyEvaluator:
             return default
     
     def extract_hierarchy(self, xml_path: str) -> List[HierarchyNode]:
-        """Extract hierarchy from XML and build tree structure."""
+        """Extract hierarchy from XML and build tree structure. Only includes codes used in open-ended questions."""
         tree = ET.parse(xml_path)
         root = tree.getroot()
         
-        # Collect all codes
+        # First, find all codes used in open-ended questions (QuestionType = 0)
+        codes_used_in_open_ended = set()
+        
+        for question in root.findall('.//Question'):
+            question_type = self._get_text(question, 'QuestionType', '0')
+            
+            # Only process open-ended questions (QuestionType = 0)
+            if question_type != '0':
+                continue
+            
+            # Collect all codes used in responses to this open-ended question
+            for response in question.findall('.//Response'):
+                for resp_code in response.findall('.//ResponseCode'):
+                    cbc_key = self._get_text(resp_code, 'DCCBCKey')
+                    if cbc_key:
+                        codes_used_in_open_ended.add(cbc_key)
+        
+        # Now collect only codes that are used in open-ended questions
         codes = []
+        code_dict = {}  # Store all codes first, then filter by usage
+        
         for codebook in root.findall('.//CodeBook'):
             for code in codebook.findall('.//CodeBookCode'):
                 key = self._get_text(code, 'CBCKey')
@@ -75,7 +94,61 @@ class HierarchyEvaluator:
                 is_net = self._get_text(code, 'CBCIsNet') == 'True'
                 ordinal = self._get_int(code, 'CBCOrdinal', 0)
                 
-                codes.append(HierarchyNode(key, description, depth, is_net, ordinal))
+                code_node = HierarchyNode(key, description, depth, is_net, ordinal)
+                code_dict[key] = code_node
+        
+        # Build full tree first to establish parent-child relationships
+        all_codes = list(code_dict.values())
+        all_codes.sort(key=lambda x: x.ordinal)
+        
+        # Build temporary tree structure to find ancestors
+        stack = []  # Stack of parents at each depth level
+        
+        for code in all_codes:
+            # Clear stack entries at same or deeper depth
+            while stack and stack[-1].depth >= code.depth:
+                stack.pop()
+            
+            if code.depth == 1:
+                stack = [code]
+            elif stack:
+                code.parent = stack[-1]
+                stack.append(code)
+            else:
+                stack = [code]
+        
+        # Now find all codes to include: used codes + all their ancestors
+        codes_to_include = set(codes_used_in_open_ended)
+        
+        # For each used code, traverse up the hierarchy to include all ancestors
+        for code_key in codes_used_in_open_ended:
+            if code_key not in code_dict:
+                continue
+            current = code_dict[code_key]
+            while current:
+                codes_to_include.add(current.key)
+                # Move to parent
+                if hasattr(current, 'parent') and current.parent:
+                    current = current.parent
+                else:
+                    # Find parent by depth (most recent code at depth-1 before this code)
+                    parent_found = False
+                    for other_code in all_codes:
+                        if (other_code.ordinal < current.ordinal and 
+                            other_code.depth == current.depth - 1):
+                            codes_to_include.add(other_code.key)
+                            current = other_code
+                            parent_found = True
+                            break
+                    if not parent_found:
+                        break
+        
+        # Filter codes to only those used in open-ended questions or their ancestors
+        codes = [code_dict[key] for key in codes_to_include if key in code_dict]
+        
+        # If no codes found, fall back to all codes (in case no open-ended questions found)
+        if not codes:
+            codes = all_codes
         
         # Sort by ordinal to maintain order
         codes.sort(key=lambda x: x.ordinal)
