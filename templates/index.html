@@ -2225,52 +2225,21 @@
         });
 
         function displayHierarchyResults(data) {
-            // Display comparison metrics
-            if (data.comparison) {
-                updateMetric('nodeSimilarity', data.comparison.node_similarity);
-                document.getElementById('treeEditDistance').textContent = data.comparison.tree_edit_distance;
-                updateMetric('ancestorAgreement', data.comparison.ancestor_descendant_agreement);
-                if (data.comparison.path_based_jaccard !== undefined) {
-                    updateMetric('pathJaccard', data.comparison.path_based_jaccard);
-                }
-                
-                // Delta metrics (lines 49-52)
-                if (data.comparison.delta_coherence !== undefined && data.comparison.delta_coherence !== null) {
-                    displayDeltaMetric('deltaCoherence', data.comparison.delta_coherence);
-                } else {
-                    document.getElementById('deltaCoherence').textContent = 'N/A';
-                }
-                
-                if (data.comparison.delta_overlap !== undefined && data.comparison.delta_overlap !== null) {
-                    displayDeltaMetric('deltaOverlap', data.comparison.delta_overlap);
-                } else {
-                    document.getElementById('deltaOverlap').textContent = 'N/A';
-                }
-                
-                if (data.comparison.delta_granularity !== undefined && data.comparison.delta_granularity !== null) {
-                    displayDeltaMetric('deltaGranularity', data.comparison.delta_granularity);
-                } else {
-                    document.getElementById('deltaGranularity').textContent = 'N/A';
-                }
-                
-                if (data.comparison.delta_consistency !== undefined && data.comparison.delta_consistency !== null) {
-                    displayDeltaMetric('deltaConsistency', data.comparison.delta_consistency);
-                } else {
-                    document.getElementById('deltaConsistency').textContent = 'N/A';
-                }
-                
-                updateMetric('hqi', data.comparison.hqi);
+            // Hide comparison metrics and statistics sections (only show trees)
+            const comparisonSection = document.querySelector('#hierarchyResultsSection .section-group');
+            if (comparisonSection && comparisonSection.querySelector('.section-title')?.textContent.includes('Comparison')) {
+                comparisonSection.style.display = 'none';
             }
+            
+            const statsSection = document.querySelectorAll('#hierarchyResultsSection .section-group');
+            statsSection.forEach(section => {
+                const title = section.querySelector('.section-title');
+                if (title && (title.textContent.includes('Statistics') || title.textContent.includes('Comparison'))) {
+                    section.style.display = 'none';
+                }
+            });
 
-            // Display statistics
-            if (data.benchmark && data.benchmark.stats) {
-                displayStats('benchmarkStats', data.benchmark.stats);
-            }
-            if (data.model && data.model.stats) {
-                displayStats('modelStats', data.model.stats);
-            }
-
-            // Display trees
+            // Display trees only
             if (data.benchmark && data.benchmark.tree) {
                 displayTree('benchmarkTree', data.benchmark.tree);
             }
