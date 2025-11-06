@@ -65,6 +65,12 @@ class HierarchyEvaluator:
                     continue
                 
                 description = self._get_text(code, 'CBCDescription')
+                
+                # Filter out "Uncoded Segment" codes (same as main evaluator)
+                desc_norm = (description or '').strip().lower()
+                if "uncoded" in desc_norm and "segment" in desc_norm:
+                    continue  # Skip this code - it's a placeholder
+                
                 depth = self._get_int(code, 'CBCDepth', 1)
                 is_net = self._get_text(code, 'CBCIsNet') == 'True'
                 ordinal = self._get_int(code, 'CBCOrdinal', 0)
