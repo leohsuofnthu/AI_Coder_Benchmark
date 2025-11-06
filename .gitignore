@@ -44,10 +44,7 @@ mismatches_report.csv
 *_mismatches.csv
 
 # Model Outputs (except example)
-ModelOutput/*_predicted.xml
-ModelOutput/*_v*.xml
-ModelOutput/test_*.xml
-!ModelOutput/Kids_Meal_example.xml
+ModelOutput/*
 
 # Jupyter Notebooks
 .ipynb_checkpoints
@@ -65,3 +62,4 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+hierarchy_metrics_spec.md

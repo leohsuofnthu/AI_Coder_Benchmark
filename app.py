@@ -16,6 +16,7 @@ import csv
 import io
 import os
 from evaluate_model import CodebookEvaluator
+from hierarchy_evaluator import HierarchyEvaluator
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size (reduced for Render free tier)
@@ -495,6 +496,45 @@ def download_mismatches():
         print(f"Download error: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/evaluate-hierarchy', methods=['POST'])
+def evaluate_hierarchy():
+    """Evaluate hierarchy structure between benchmark and model."""
+    try:
+        if 'benchmark_file' not in request.files or 'model_file' not in request.files:
+            return jsonify({'error': 'Both benchmark and model files required'}), 400
+        
+        benchmark_file = request.files['benchmark_file']
+        model_file = request.files['model_file']
+        
+        if benchmark_file.filename == '' or model_file.filename == '':
+            return jsonify({'error': 'Both files must be selected'}), 400
+        
+        # Save files temporarily
+        upload_folder = Path(app.config['UPLOAD_FOLDER'])
+        benchmark_path = upload_folder / benchmark_file.filename
+        model_path = upload_folder / f"model_{model_file.filename}"
+        
+        benchmark_file.save(str(benchmark_path))
+        model_file.save(str(model_path))
+        
+        # Run evaluation
+        evaluator = HierarchyEvaluator(str(benchmark_path), str(model_path))
+        results = evaluator.evaluate()
+        
+        # Clean up
+        benchmark_path.unlink(missing_ok=True)
+        model_path.unlink(missing_ok=True)
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        import traceback
+        error_msg = f"Hierarchy evaluation error: {str(e)}"
+        print(error_msg)
+        print(traceback.format_exc())
+        return jsonify({'error': error_msg, 'details': traceback.format_exc()}), 500
 
 
 @app.route('/api/test')

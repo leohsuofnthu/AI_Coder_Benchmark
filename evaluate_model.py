@@ -29,9 +29,10 @@ class CodebookEvaluator:
         self.model_output_path = model_output_path
         
         # Data structures
-        self.codebook = {}  # CBCKey -> code details
+        self.codebook = {}  # CBCKey -> code details (from benchmark)
         self.benchmark_responses = {}  # (respondent_id, question_id) -> set of CBCKeys
         self.model_responses = {}  # (respondent_id, question_id) -> set of CBCKeys
+        self.model_to_benchmark_code_map = {}  # model_code_key -> benchmark_code_key (by description)
         
         # Metrics storage
         self.metrics = {}
@@ -56,9 +57,17 @@ class CodebookEvaluator:
                 cbc_key = code.find('CBCKey')
                 if cbc_key is not None:
                     key = cbc_key.text
+                    description = self._get_text(code, 'CBCDescription')
+                    
+                    # Normalization: Filter out "Uncoded Segment" codes from codebook
+                    # These are placeholder codes that should be treated as Uncoded
+                    desc_norm = (description or '').strip().lower()
+                    if "uncoded" in desc_norm and "segment" in desc_norm:
+                        continue  # Skip this code - it's a placeholder
+                    
                     codebook[key] = {
                         'key': key,
-                        'description': self._get_text(code, 'CBCDescription'),
+                        'description': description,
                         'depth': int(self._get_text(code, 'CBCDepth', '0')),
                         'is_net': self._get_text(code, 'CBCIsNet') == 'True',
                         'output_id': self._get_text(code, 'CBCOutputID'),
@@ -101,6 +110,23 @@ class CodebookEvaluator:
                     cbc_key = self._get_text(resp_code, 'DCCBCKey')
                     if cbc_key:
                         codes.add(cbc_key)
+
+                # Normalization: map any "Uncoded Segment"-style placeholder codes to Uncoded
+                # We implement this by removing such placeholder codes from the set.
+                # If a response only contains these placeholders, it will end up with an empty set
+                # which downstream is treated as the Uncoded bucket.
+                if codes:
+                    filtered_codes = set()
+                    for key in codes:
+                        # Skip if code was filtered from codebook (e.g., "Uncoded Segment")
+                        if key not in codebook:
+                            continue
+                        desc = codebook[key].get('description', '')
+                        norm = (desc or '').strip().lower()
+                        # match common variants: "uncoded segment", "uncoded segments", "uncoded segment category"
+                        if not ("uncoded" in norm and "segment" in norm):
+                            filtered_codes.add(key)
+                    codes = filtered_codes
                 
                 # Store with unique key
                 key = (respondent_id, question_id)
@@ -124,9 +150,39 @@ class CodebookEvaluator:
         child = element.find(tag)
         return child.text if child is not None and child.text else default
     
+    def _build_code_mapping(self, benchmark_codebook: Dict, model_codebook: Dict) -> Dict[str, str]:
+        """
+        Build mapping from model code keys to benchmark code keys based on description matching.
+        
+        Args:
+            benchmark_codebook: Codebook from benchmark XML
+            model_codebook: Codebook from model output XML
+            
+        Returns:
+            Dictionary mapping model_code_key -> benchmark_code_key
+        """
+        mapping = {}
+        
+        # Create reverse lookup: description -> benchmark_code_key
+        # Handle case where multiple codes might have same description (use first match)
+        desc_to_benchmark = {}
+        for bench_key, bench_code in benchmark_codebook.items():
+            desc = (bench_code.get('description', '') or '').strip().lower()
+            if desc and desc not in desc_to_benchmark:
+                desc_to_benchmark[desc] = bench_key
+        
+        # Map model codes to benchmark codes by description
+        for model_key, model_code in model_codebook.items():
+            desc = (model_code.get('description', '') or '').strip().lower()
+            if desc and desc in desc_to_benchmark:
+                mapping[model_key] = desc_to_benchmark[desc]
+        
+        return mapping
+    
     def _validate_codebook(self, benchmark_codebook: Dict, model_codebook: Dict):
         """
         Validate that model output has the same codebook architecture as benchmark.
+        Matches codes by description (not by key) to handle different code IDs.
         
         Args:
             benchmark_codebook: Codebook from benchmark XML
@@ -135,7 +191,7 @@ class CodebookEvaluator:
         Raises:
             ValueError: If codebooks don't match
         """
-        print("\n🔍 Validating codebook architecture...")
+        print("\n🔍 Validating codebook architecture (matching by description)...")
         
         # Check if both have codebooks
         if not benchmark_codebook:
@@ -144,56 +200,68 @@ class CodebookEvaluator:
         if not model_codebook:
             raise ValueError("Model output XML has no codebook!")
         
-        # Check number of codes
-        if len(benchmark_codebook) != len(model_codebook):
-            raise ValueError(
-                f"❌ Codebook size mismatch!\n"
-                f"   Benchmark has {len(benchmark_codebook)} codes\n"
-                f"   Model output has {len(model_codebook)} codes\n"
-                f"   The codebook architecture must be identical."
-            )
+        # Build mapping from model codes to benchmark codes by description
+        model_to_benchmark = self._build_code_mapping(benchmark_codebook, model_codebook)
         
-        # Check that all benchmark codes exist in model
-        benchmark_keys = set(benchmark_codebook.keys())
-        model_keys = set(model_codebook.keys())
+        # Create reverse lookup: benchmark description -> benchmark key
+        benchmark_desc_to_key = {}
+        for bench_key, bench_code in benchmark_codebook.items():
+            desc = (bench_code.get('description', '') or '').strip().lower()
+            if desc:
+                benchmark_desc_to_key[desc] = bench_key
         
-        missing_in_model = benchmark_keys - model_keys
-        extra_in_model = model_keys - benchmark_keys
+        # Create model description -> model key lookup
+        model_desc_to_key = {}
+        for model_key, model_code in model_codebook.items():
+            desc = (model_code.get('description', '') or '').strip().lower()
+            if desc:
+                model_desc_to_key[desc] = model_key
+        
+        # Check that all benchmark codes (by description) exist in model
+        benchmark_descriptions = set(benchmark_desc_to_key.keys())
+        model_descriptions = set(model_desc_to_key.keys())
+        
+        missing_in_model = benchmark_descriptions - model_descriptions
+        extra_in_model = model_descriptions - benchmark_descriptions
         
         if missing_in_model:
-            missing_codes = list(missing_in_model)[:5]  # Show first 5
+            missing_examples = []
+            for desc in list(missing_in_model)[:5]:
+                bench_key = benchmark_desc_to_key[desc]
+                bench_code = benchmark_codebook[bench_key]
+                missing_examples.append(f"'{bench_code.get('description', desc)}' (benchmark key: {bench_key})")
+            
             raise ValueError(
                 f"❌ Codebook mismatch: Model output is missing {len(missing_in_model)} codes from benchmark!\n"
-                f"   Examples of missing codes: {missing_codes}\n"
-                f"   You must use the same codebook structure as the benchmark."
+                f"   Examples of missing codes:\n"
+                f"   {chr(10).join('   - ' + ex for ex in missing_examples)}\n"
+                f"   Codes are matched by description text, not by key/ID."
             )
         
         if extra_in_model:
-            extra_codes = list(extra_in_model)[:5]  # Show first 5
+            extra_examples = []
+            for desc in list(extra_in_model)[:5]:
+                model_key = model_desc_to_key[desc]
+                model_code = model_codebook[model_key]
+                extra_examples.append(f"'{model_code.get('description', desc)}' (model key: {model_key})")
+            
             raise ValueError(
                 f"❌ Codebook mismatch: Model output has {len(extra_in_model)} extra codes not in benchmark!\n"
-                f"   Examples of extra codes: {extra_codes}\n"
-                f"   You must use the same codebook structure as the benchmark."
+                f"   Examples of extra codes:\n"
+                f"   {chr(10).join('   - ' + ex for ex in extra_examples)}\n"
+                f"   Codes are matched by description text, not by key/ID."
             )
         
-        # Check that code properties match (description, depth)
+        # Check that code properties match for matched codes (by description)
         mismatches = []
-        for code_key in benchmark_keys:
-            bench_code = benchmark_codebook[code_key]
-            model_code = model_codebook[code_key]
-            
-            # Check description
-            if bench_code.get('description') != model_code.get('description'):
-                mismatches.append(
-                    f"Code {code_key}: Description mismatch\n"
-                    f"     Benchmark: '{bench_code.get('description')}'\n"
-                    f"     Model: '{model_code.get('description')}'"
-                )
+        for model_key, bench_key in model_to_benchmark.items():
+            bench_code = benchmark_codebook[bench_key]
+            model_code = model_codebook[model_key]
             
             # Check depth (hierarchy level)
             if bench_code.get('depth') != model_code.get('depth'):
                 mismatches.append(
-                    f"Code {code_key}: Hierarchy depth mismatch\n"
+                    f"Code '{bench_code.get('description', '')}' (benchmark: {bench_key}, model: {model_key}): Hierarchy depth mismatch\n"
                     f"     Benchmark: {bench_code.get('depth')}\n"
                     f"     Model: {model_code.get('depth')}"
                 )
@@ -201,7 +269,7 @@ class CodebookEvaluator:
             # Check is_net flag
             if bench_code.get('is_net') != model_code.get('is_net'):
                 mismatches.append(
-                    f"Code {code_key}: Net code flag mismatch\n"
+                    f"Code '{bench_code.get('description', '')}' (benchmark: {bench_key}, model: {model_key}): Net code flag mismatch\n"
                     f"     Benchmark: {bench_code.get('is_net')}\n"
                     f"     Model: {model_code.get('is_net')}"
                 )
@@ -209,7 +277,6 @@ class CodebookEvaluator:
         if mismatches:
             # Categorize mismatches by type
             hierarchy_mismatches = [m for m in mismatches if 'Hierarchy depth' in m]
-            description_mismatches = [m for m in mismatches if 'Description mismatch' in m]
             net_mismatches = [m for m in mismatches if 'Net code flag' in m]
             
             # Build error message with categorization
@@ -221,12 +288,6 @@ class CodebookEvaluator:
                     # Extract first line (code key and issue)
                     first_line = m.split('\n')[0] if '\n' in m else m
                     error_parts.append(f"       {first_line}")
-            
-            if description_mismatches:
-                error_parts.append(f"   • Description Mismatch: {len(description_mismatches)} code(s) have different descriptions")
-                if description_mismatches:
-                    first_line = description_mismatches[0].split('\n')[0] if '\n' in description_mismatches[0] else description_mismatches[0]
-                    error_parts.append(f"     Example: {first_line}")
             
             if net_mismatches:
                 error_parts.append(f"   • Net Flag Mismatch: {len(net_mismatches)} code(s) have different net flags")
@@ -242,10 +303,10 @@ class CodebookEvaluator:
                 f"{error_summary}\n\n"
                 f"   Detailed mismatches:\n   {error_details}{more_text}\n\n"
                 f"   The codebook hierarchy and structure must be identical to the benchmark.\n"
-                f"   Copy the entire <CodeBooks> section from the benchmark XML to your model output."
+                f"   Codes are matched by description text, not by key/ID."
             )
         
-        print("✓ Codebook validation passed - architectures match!")
+        print(f"✓ Codebook validation passed - {len(model_to_benchmark)} codes matched by description!")
     
     def load_data(self):
         """Load both benchmark and model output data."""
@@ -259,19 +320,25 @@ class CodebookEvaluator:
         # Load model output
         model_codebook, self.model_responses = self.parse_xml(self.model_output_path)
         
-        # Validate codebook architecture matches
+        # Build mapping from model codes to benchmark codes (by description)
+        self.model_to_benchmark_code_map = self._build_code_mapping(self.codebook, model_codebook)
+        
+        # Validate codebook architecture matches (by description)
         self._validate_codebook(self.codebook, model_codebook)
         
         print(f"\nCodebook contains {len(self.codebook)} unique codes")
         print(f"Benchmark contains {len(self.benchmark_responses)} responses")
         print(f"Model output contains {len(self.model_responses)} responses")
+        print(f"Code mapping: {len(self.model_to_benchmark_code_map)} model codes mapped to benchmark codes")
         
     def align_responses(self) -> List[Tuple[str, Set[str], Set[str]]]:
         """
         Align benchmark and model responses by (respondent_id, question_id).
+        Maps model codes to benchmark codes using description-based mapping.
         
         Returns:
             List of (key, ground_truth_codes, predicted_codes)
+            where predicted_codes are mapped to benchmark code keys
         """
         aligned = []
         
@@ -290,11 +357,26 @@ class CodebookEvaluator:
         if extra_in_model:
             print(f"⚠️  WARNING: {len(extra_in_model)} responses in model output but not in benchmark")
         
-        # Align common responses
+        # Align common responses and map model codes to benchmark codes
+        unmapped_codes = set()
         for key in common_keys:
             ground_truth = self.benchmark_responses[key]
-            predicted = self.model_responses[key]
+            model_codes = self.model_responses[key]
+            
+            # Map model codes to benchmark codes
+            predicted = set()
+            for model_code_key in model_codes:
+                if model_code_key in self.model_to_benchmark_code_map:
+                    predicted.add(self.model_to_benchmark_code_map[model_code_key])
+                else:
+                    # Track unmapped codes (shouldn't happen if validation passed, but handle gracefully)
+                    unmapped_codes.add(model_code_key)
+            
             aligned.append((key, ground_truth, predicted))
+        
+        if unmapped_codes:
+            print(f"\n⚠️  WARNING: {len(unmapped_codes)} model code(s) could not be mapped to benchmark codes")
+            print(f"   This may indicate codes in responses that weren't in the codebook")
         
         print(f"\n✓ Aligned {len(aligned)} responses for evaluation")
         return aligned

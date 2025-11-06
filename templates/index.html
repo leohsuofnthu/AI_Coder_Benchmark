@@ -26,15 +26,15 @@
             --success-light: #34d399;
             --success-dark: #059669;
             
-            /* Warning - Warm Amber */
-            --warning-color: #f59e0b;
-            --warning-light: #fbbf24;
-            --warning-dark: #d97706;
+            /* Warning - Softer Amber */
+            --warning-color: #f2b266; /* softened */
+            --warning-light: #f6cf8f;
+            --warning-dark: #d7923e;
             
-            /* Danger - Soft Coral */
-            --danger-color: #f87171;
-            --danger-light: #fca5a5;
-            --danger-dark: #ef4444;
+            /* Danger - Muted Coral */
+            --danger-color: #f17373; /* softened */
+            --danger-light: #f6a2a2;
+            --danger-dark: #e44747;
             
             /* Accent - Elegant Purple */
             --accent-purple: #8b5cf6;
@@ -62,6 +62,21 @@
             min-height: 100vh;
             font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
             color: var(--text-primary);
+        }
+
+        /* Dark grid table styling for better contrast */
+        .table-dark-grid thead th {
+            background: var(--surface-bg) !important;
+            color: var(--text-primary) !important;
+            border-bottom: 1px solid var(--card-border) !important;
+        }
+        .table-dark-grid tbody td {
+            background: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+            border-top: 1px solid var(--surface-bg) !important;
+        }
+        .table-dark-grid tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.02) !important;
         }
         
         .main-container {
@@ -668,6 +683,22 @@
             <p>Multi-label classification evaluation for response coding models</p>
         </div>
 
+        <!-- Tab Navigation -->
+        <div class="tab-navigation mb-4">
+            <div class="nav nav-tabs" role="tablist" style="border-bottom: 2px solid var(--card-border);">
+                <button class="nav-link active" id="codeAssignmentTab" data-bs-toggle="tab" data-bs-target="#codeAssignment" type="button" role="tab" style="background: transparent; border: none; color: var(--text-primary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
+                    <i class="fas fa-code me-2"></i>Code Assignment
+                </button>
+                <button class="nav-link" id="hierarchyTab" data-bs-toggle="tab" data-bs-target="#hierarchy" type="button" role="tab" style="background: transparent; border: none; color: var(--text-secondary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
+                    <i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Code Assignment Tab -->
+            <div class="tab-pane fade show active" id="codeAssignment" role="tabpanel">
         <!-- Upload Section -->
         <div class="upload-section">
             <h2 class="mb-4"><i class="fas fa-upload me-2"></i>Upload Model Output</h2>
@@ -896,21 +927,21 @@
                 </div>
                 
                 <div class="table-responsive">
-                    <table class="table table-hover" style="background: var(--card-bg); border-radius: 0.5rem; overflow: hidden; border-collapse: separate; border-spacing: 0;">
-                        <thead style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-bottom: 2px solid var(--card-border);">
+                    <table class="table table-hover table-dark-grid" style="background: var(--card-bg); border-radius: 0.5rem; overflow: hidden; border-collapse: separate; border-spacing: 0;">
+                        <thead style="border-bottom: 2px solid var(--card-border);">
                             <tr>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;">Question ID</th>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Total</th>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
-                                    <span class="badge" style="background: var(--warning-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);">Benchmark<br/>Uncoded</span>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;">Question ID</th>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Total</th>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: rgba(242, 178, 102, 0.18); color: var(--warning-light); padding: 0.4rem 0.75rem; border: 1px solid rgba(242, 178, 102, 0.35); border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: none;">Benchmark<br/>Uncoded</span>
                                 </th>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
-                                    <span class="badge" style="background: var(--danger-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(248, 113, 113, 0.2);">Model<br/>Uncoded</span>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: rgba(241, 115, 115, 0.18); color: var(--danger-light); padding: 0.4rem 0.75rem; border: 1px solid rgba(241, 115, 115, 0.35); border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: none;">Model<br/>Uncoded</span>
                                 </th>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
-                                    <span class="badge" style="background: var(--success-color); color: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">Both<br/>Uncoded</span>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em;" class="text-center">
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.18); color: var(--success-light); padding: 0.4rem 0.75rem; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; line-height: 1.3; display: inline-block; box-shadow: none;">Both<br/>Uncoded</span>
                                 </th>
-                                <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Overlap %</th>
+                                <th style="color: var(--text-secondary); font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Overlap %</th>
                                 <th style="color: #475569; font-weight: 700; padding: 1rem 0.75rem; font-size: 0.875rem; letter-spacing: 0.025em; text-transform: uppercase;" class="text-center">Accuracy</th>
                             </tr>
                         </thead>
@@ -1026,10 +1057,215 @@
                             <span class="badge bg-warning text-dark me-1">⚠️ Extra</span> = Should NOT have predicted
                         </small>
                     </div>
-                    <div id="worstMismatches" class="mismatch-list"></div>
+                    <div id="worstMismatches" class="mismatch-list">                    </div>
                 </div>
             </div>
         </div>
+            </div>
+            <!-- End Code Assignment Tab -->
+
+            <!-- Hierarchy Evaluation Tab -->
+            <div class="tab-pane fade" id="hierarchy" role="tabpanel">
+                <div class="upload-section">
+                    <h2 class="mb-4"><i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation</h2>
+                    
+                    <div class="row g-4">
+                        <!-- Benchmark Upload -->
+                        <div class="col-md-6">
+                            <h3 class="mb-3"><i class="fas fa-database me-2"></i>Benchmark XML</h3>
+                            <div class="upload-area" id="benchmarkHierarchyUpload">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h4>Drag & Drop Benchmark XML</h4>
+                                <p class="text-muted">or click to browse</p>
+                                <input type="file" id="benchmarkHierarchyInput" accept=".xml" style="display: none;">
+                                <div id="benchmarkHierarchyInfo" class="mt-3" style="display: none;">
+                                    <span class="badge bg-primary fs-6">
+                                        <i class="fas fa-file-code me-2"></i><span id="benchmarkHierarchyFileName"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Model Upload -->
+                        <div class="col-md-6">
+                            <h3 class="mb-3"><i class="fas fa-robot me-2"></i>Model Output XML</h3>
+                            <div class="upload-area" id="modelHierarchyUpload">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h4>Drag & Drop Model XML</h4>
+                                <p class="text-muted">or click to browse</p>
+                                <input type="file" id="modelHierarchyInput" accept=".xml" style="display: none;">
+                                <div id="modelHierarchyInfo" class="mt-3" style="display: none;">
+                                    <span class="badge bg-success fs-6">
+                                        <i class="fas fa-file-code me-2"></i><span id="modelHierarchyFileName"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Evaluate Button -->
+                    <div class="text-center mt-4">
+                        <button class="btn btn-evaluate text-white" id="evaluateHierarchyBtn" disabled>
+                            <i class="fas fa-chart-line me-2"></i>Evaluate Hierarchy
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hierarchy Results Section -->
+                <div class="results-section" id="hierarchyResultsSection" style="display: none;">
+                    <div class="results-header mb-5">
+                        <h2 class="mb-2"><i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation Results</h2>
+                    </div>
+
+                    <!-- Comparison Metrics -->
+                    <div class="section-group mb-5">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-chart-bar me-2"></i>Comparison Metrics
+                        </h3>
+                        <div class="row g-4">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-project-diagram fa-2x" style="color: var(--primary-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Node Similarity</div>
+                                    <div class="metric-value" id="nodeSimilarity">-</div>
+                                    <small class="text-muted">Semantic alignment</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-code-branch fa-2x" style="color: var(--success-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Tree Edit Distance</div>
+                                    <div class="metric-value" id="treeEditDistance">-</div>
+                                    <small class="text-muted">Structural differences</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-link fa-2x" style="color: var(--warning-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Ancestor Agreement</div>
+                                    <div class="metric-value" id="ancestorAgreement">-</div>
+                                    <small class="text-muted">Relation preservation</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-route fa-2x" style="color: var(--accent-purple-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Path Jaccard</div>
+                                    <div class="metric-value" id="pathJaccard">-</div>
+                                    <small class="text-muted">Path overlap</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-4 mt-2">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-sitemap fa-2x" style="color: var(--accent-indigo);"></i>
+                                    </div>
+                                    <div class="metric-label">Δ Coherence</div>
+                                    <div class="metric-value" id="deltaCoherence">-</div>
+                                    <small class="text-muted">Model - Benchmark</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-layer-group fa-2x" style="color: var(--warning-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Δ Overlap</div>
+                                    <div class="metric-value" id="deltaOverlap">-</div>
+                                    <small class="text-muted">Human - Model</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-chart-area fa-2x" style="color: var(--success-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Δ Granularity</div>
+                                    <div class="metric-value" id="deltaGranularity">-</div>
+                                    <small class="text-muted">Model - Benchmark</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-link fa-2x" style="color: var(--primary-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Δ Consistency</div>
+                                    <div class="metric-value" id="deltaConsistency">-</div>
+                                    <small class="text-muted">Model - Benchmark</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-4 mt-2">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card metric-primary text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-star fa-2x" style="color: var(--primary-light);"></i>
+                                    </div>
+                                    <div class="metric-label">HQI</div>
+                                    <div class="metric-value" id="hqi">-</div>
+                                    <small class="text-muted">Quality index</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hierarchy Statistics -->
+                    <div class="section-group mb-5">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-info-circle me-2"></i>Hierarchy Statistics
+                        </h3>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h4 class="mb-3">Benchmark Hierarchy</h4>
+                                    <div id="benchmarkStats"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h4 class="mb-3">Model Hierarchy</h4>
+                                    <div id="modelStats"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hierarchy Visualization -->
+                    <div class="section-group mb-5">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-sitemap me-2"></i>Hierarchy Visualization
+                        </h3>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h4 class="mb-3">Benchmark</h4>
+                                    <div id="benchmarkTree" style="min-height: 400px; overflow: auto;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h4 class="mb-3">Model</h4>
+                                    <div id="modelTree" style="min-height: 400px; overflow: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Hierarchy Tab -->
+        </div>
+        <!-- End Tab Content -->
     </div>
 
     <!-- Bootstrap JS -->
@@ -1437,23 +1673,23 @@
                                         ${q.total_responses}
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge" style="background: var(--warning-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                        <span class="badge" style="background: rgba(242, 178, 102, 0.18); color: var(--warning-light); padding: 0.35rem 0.65rem; border: 1px solid rgba(242, 178, 102, 0.35); border-radius: 0.375rem; font-weight: 500;">
                                             ${q.benchmark_uncoded}
                                             <small>(${q.benchmark_uncoded_percentage.toFixed(1)}%)</small>
                                         </span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge" style="background: var(--danger-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                        <span class="badge" style="background: rgba(241, 115, 115, 0.18); color: var(--danger-light); padding: 0.35rem 0.65rem; border: 1px solid rgba(241, 115, 115, 0.35); border-radius: 0.375rem; font-weight: 500;">
                                             ${q.model_uncoded}
                                             <small>(${q.model_uncoded_percentage.toFixed(1)}%)</small>
                                         </span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge" style="background: var(--success-color); color: white; padding: 0.35rem 0.65rem; border-radius: 0.375rem; font-weight: 500;">
+                                        <span class="badge" style="background: rgba(16, 185, 129, 0.18); color: var(--success-light); padding: 0.35rem 0.65rem; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 0.375rem; font-weight: 500;">
                                             ${q.both_uncoded}
                                         </span>
                                     </td>
-                                <td class="text-center" style="font-weight: 600; color: ${overlapPct >= 80 ? 'var(--success-color)' : (overlapPct < 50 && overlapPct > 0 ? 'var(--danger-color)' : 'var(--warning-color)')};">
+                                <td class="text-center" style="font-weight: 600; color: ${overlapPct >= 80 ? 'var(--success-light)' : (overlapPct < 50 && overlapPct > 0 ? 'var(--danger-light)' : 'var(--warning-light)')};">
                                     ${overlapPct.toFixed(1)}%
                                 </td>
                                 `;
@@ -1585,6 +1821,29 @@
                 else if (value >= 0.60) label.textContent = 'Good';
                 else if (value >= 0.40) label.textContent = 'Fair';
                 else label.textContent = 'Needs Improvement';
+            }
+        }
+
+        function displayDeltaMetric(elementId, delta) {
+            const element = document.getElementById(elementId);
+            const displayValue = delta >= 0 ? `+${delta.toFixed(3)}` : delta.toFixed(3);
+            element.textContent = displayValue;
+            
+            // Color coding for delta metrics
+            element.className = 'metric-value ';
+            // For delta metrics, positive is often good (except overlap)
+            if (elementId === 'deltaOverlap') {
+                // For overlap, lower is better (human - model), so negative delta is good
+                if (delta <= -0.05) element.classList.add('metric-excellent');
+                else if (delta <= 0) element.classList.add('metric-good');
+                else if (delta <= 0.1) element.classList.add('metric-fair');
+                else element.classList.add('metric-poor');
+            } else {
+                // For other deltas, positive is often good
+                if (delta >= 0.1) element.classList.add('metric-excellent');
+                else if (delta >= 0) element.classList.add('metric-good');
+                else if (delta >= -0.1) element.classList.add('metric-fair');
+                else element.classList.add('metric-poor');
             }
         }
 
@@ -1884,6 +2143,231 @@
                 }
             });
         }
+
+        // ===== Hierarchy Evaluation Tab =====
+        let benchmarkHierarchyFile = null;
+        let modelHierarchyFile = null;
+
+        // Benchmark hierarchy upload
+        const benchmarkHierarchyUpload = document.getElementById('benchmarkHierarchyUpload');
+        const benchmarkHierarchyInput = document.getElementById('benchmarkHierarchyInput');
+        const benchmarkHierarchyInfo = document.getElementById('benchmarkHierarchyInfo');
+        const benchmarkHierarchyFileName = document.getElementById('benchmarkHierarchyFileName');
+
+        benchmarkHierarchyUpload.addEventListener('click', () => benchmarkHierarchyInput.click());
+        benchmarkHierarchyInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                benchmarkHierarchyFile = e.target.files[0];
+                benchmarkHierarchyFileName.textContent = benchmarkHierarchyFile.name;
+                benchmarkHierarchyInfo.style.display = 'block';
+                checkHierarchyReady();
+            }
+        });
+
+        // Model hierarchy upload
+        const modelHierarchyUpload = document.getElementById('modelHierarchyUpload');
+        const modelHierarchyInput = document.getElementById('modelHierarchyInput');
+        const modelHierarchyInfo = document.getElementById('modelHierarchyInfo');
+        const modelHierarchyFileName = document.getElementById('modelHierarchyFileName');
+
+        modelHierarchyUpload.addEventListener('click', () => modelHierarchyInput.click());
+        modelHierarchyInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                modelHierarchyFile = e.target.files[0];
+                modelHierarchyFileName.textContent = modelHierarchyFile.name;
+                modelHierarchyInfo.style.display = 'block';
+                checkHierarchyReady();
+            }
+        });
+
+        function checkHierarchyReady() {
+            const btn = document.getElementById('evaluateHierarchyBtn');
+            btn.disabled = !(benchmarkHierarchyFile && modelHierarchyFile);
+        }
+
+        // Evaluate hierarchy
+        document.getElementById('evaluateHierarchyBtn').addEventListener('click', async () => {
+            if (!benchmarkHierarchyFile || !modelHierarchyFile) return;
+
+            const formData = new FormData();
+            formData.append('benchmark_file', benchmarkHierarchyFile);
+            formData.append('model_file', modelHierarchyFile);
+
+            document.getElementById('loadingOverlay').classList.add('active');
+
+            try {
+                const response = await fetch('/api/evaluate-hierarchy', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    showPageError(
+                        data.error || 'Hierarchy Evaluation Failed',
+                        data.message || 'An error occurred during hierarchy evaluation.',
+                        data.suggestion || 'Please check your files and try again.'
+                    );
+                    return;
+                }
+
+                displayHierarchyResults(data);
+            } catch (error) {
+                showPageError(
+                    'Hierarchy Evaluation Failed',
+                    error.message || 'An unexpected error occurred.',
+                    'Please check your files and try again.'
+                );
+            } finally {
+                document.getElementById('loadingOverlay').classList.remove('active');
+            }
+        });
+
+        function displayHierarchyResults(data) {
+            // Display comparison metrics
+            if (data.comparison) {
+                updateMetric('nodeSimilarity', data.comparison.node_similarity);
+                document.getElementById('treeEditDistance').textContent = data.comparison.tree_edit_distance;
+                updateMetric('ancestorAgreement', data.comparison.ancestor_descendant_agreement);
+                if (data.comparison.path_based_jaccard !== undefined) {
+                    updateMetric('pathJaccard', data.comparison.path_based_jaccard);
+                }
+                
+                // Delta metrics (lines 49-52)
+                if (data.comparison.delta_coherence !== undefined && data.comparison.delta_coherence !== null) {
+                    displayDeltaMetric('deltaCoherence', data.comparison.delta_coherence);
+                } else {
+                    document.getElementById('deltaCoherence').textContent = 'N/A';
+                }
+                
+                if (data.comparison.delta_overlap !== undefined && data.comparison.delta_overlap !== null) {
+                    displayDeltaMetric('deltaOverlap', data.comparison.delta_overlap);
+                } else {
+                    document.getElementById('deltaOverlap').textContent = 'N/A';
+                }
+                
+                if (data.comparison.delta_granularity !== undefined && data.comparison.delta_granularity !== null) {
+                    displayDeltaMetric('deltaGranularity', data.comparison.delta_granularity);
+                } else {
+                    document.getElementById('deltaGranularity').textContent = 'N/A';
+                }
+                
+                if (data.comparison.delta_consistency !== undefined && data.comparison.delta_consistency !== null) {
+                    displayDeltaMetric('deltaConsistency', data.comparison.delta_consistency);
+                } else {
+                    document.getElementById('deltaConsistency').textContent = 'N/A';
+                }
+                
+                updateMetric('hqi', data.comparison.hqi);
+            }
+
+            // Display statistics
+            if (data.benchmark && data.benchmark.stats) {
+                displayStats('benchmarkStats', data.benchmark.stats);
+            }
+            if (data.model && data.model.stats) {
+                displayStats('modelStats', data.model.stats);
+            }
+
+            // Display trees
+            if (data.benchmark && data.benchmark.tree) {
+                displayTree('benchmarkTree', data.benchmark.tree);
+            }
+            if (data.model && data.model.tree) {
+                displayTree('modelTree', data.model.tree);
+            }
+
+            // Show results section
+            const resultsSection = document.getElementById('hierarchyResultsSection');
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function displayStats(containerId, stats) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+                <div class="mb-2"><strong>Total Nodes:</strong> ${stats.total_nodes || 0}</div>
+                <div class="mb-2"><strong>Leaf Nodes:</strong> ${stats.leaf_nodes || 0}</div>
+                <div class="mb-2"><strong>Max Depth:</strong> ${stats.max_depth || 0}</div>
+                <div class="mb-2"><strong>Net Nodes:</strong> ${stats.net_nodes || 0}</div>
+                <div class="mb-2"><strong>Code Nodes:</strong> ${stats.code_nodes || 0}</div>
+                <div class="mb-2"><strong>Avg Branching:</strong> ${stats.avg_branching_factor || 0}</div>
+                <div class="mb-2"><strong>Depth Variance:</strong> ${stats.depth_variance || 0}</div>
+                ${stats.coherence !== undefined ? `
+                    <div class="mt-3 pt-3 border-top" style="border-color: var(--card-border);">
+                        <div class="mb-2"><strong>Coherence:</strong> <span class="${stats.coherence >= 0.75 ? 'text-success' : stats.coherence >= 0.5 ? 'text-warning' : 'text-danger'}">${stats.coherence.toFixed(3)}</span></div>
+                        ${stats.overlap !== undefined ? `<div class="mb-2"><strong>Overlap:</strong> <span class="${stats.overlap <= 0.10 ? 'text-success' : stats.overlap <= 0.3 ? 'text-warning' : 'text-danger'}">${stats.overlap.toFixed(3)}</span></div>` : ''}
+                        ${stats.consistency !== undefined ? `<div class="mb-2"><strong>Consistency:</strong> <span class="${stats.consistency >= 0.15 && stats.consistency <= 0.35 ? 'text-success' : 'text-warning'}">${stats.consistency.toFixed(3)}</span></div>` : ''}
+                        ${stats.granularity ? `
+                            <div class="mb-2"><strong>Granularity:</strong>
+                                ${Object.entries(stats.granularity).map(([level, val]) => 
+                                    `<span class="badge badge-depth-${level} me-1">L${level}: ${val.toFixed(2)}</span>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : ''}
+                ${stats.depth_distribution ? `
+                    <div class="mt-3">
+                        <strong>Depth Distribution:</strong>
+                        <div class="mt-2">
+                            ${Object.entries(stats.depth_distribution).map(([depth, count]) => 
+                                `<span class="badge badge-depth-${depth} me-2">Depth ${depth}: ${count}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function displayTree(containerId, tree) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            function renderNode(node, level = 0) {
+                const indent = level * 20;
+                const isNet = node.is_net || false;
+                const nodeClass = isNet ? 'text-primary' : 'text-secondary';
+                const icon = isNet ? 'fa-folder' : 'fa-file';
+                
+                const nodeDiv = document.createElement('div');
+                nodeDiv.className = 'mb-2';
+                nodeDiv.style.paddingLeft = `${indent}px`;
+                nodeDiv.innerHTML = `
+                    <div class="d-flex align-items-center ${nodeClass}">
+                        <i class="fas ${icon} me-2"></i>
+                        <span class="badge badge-depth-${node.depth} me-2">L${node.depth}</span>
+                        <strong>${node.key}</strong>
+                        <span class="ms-2 text-muted">${node.description || ''}</span>
+                    </div>
+                `;
+                container.appendChild(nodeDiv);
+                
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => renderNode(child, level + 1));
+                }
+            }
+            
+            renderNode(tree);
+        }
+
+        // Tab switching styling
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function (e) {
+                // Update active tab styling
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.style.color = 'var(--text-secondary)';
+                    link.style.borderBottom = 'none';
+                });
+                e.target.style.color = 'var(--text-primary)';
+                e.target.style.borderBottom = '2px solid var(--primary-color)';
+            });
+        });
+        
+        // Set initial active tab styling
+        document.querySelector('.nav-link.active').style.color = 'var(--text-primary)';
+        document.querySelector('.nav-link.active').style.borderBottom = '2px solid var(--primary-color)';
     </script>
 </body>
 </html>
