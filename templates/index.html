@@ -2651,24 +2651,93 @@
                         jobId = data.job_id;
                         let evaluationResults = null;
                         
+                        // Small delay before first poll to ensure backend has initialized the job
+                        // This helps avoid race conditions on slower connections or servers (like Render)
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Reset error count
+                        window.progressErrorCount = 0;
+                        
                         progressInterval = setInterval(async () => {
                             try {
-                                const progressResponse = await fetch(`/api/hierarchy-progress/${jobId}`);
+                                // Create abort controller for timeout
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+                                
+                                const progressResponse = await fetch(`/api/hierarchy-progress/${jobId}`, {
+                                    method: 'GET',
+                                    headers: {
+                                        'Accept': 'application/json'
+                                    },
+                                    signal: controller.signal
+                                });
+                                
+                                clearTimeout(timeoutId);
+                                
+                                // Handle non-OK responses
                                 if (!progressResponse.ok) {
-                                    clearInterval(progressInterval);
-                                    showPageError(
-                                        'Progress Error',
-                                        'Failed to fetch progress',
-                                        'Please try again.'
-                                    );
-                                    progressContainer.style.display = 'none';
-                                    loadingOverlay.classList.remove('active');
-                                    return;
+                                    // Don't fail immediately on 404 - job might not be created yet
+                                    if (progressResponse.status === 404) {
+                                        console.warn(`Job ${jobId} not found yet, will retry...`);
+                                        return; // Continue polling
+                                    }
+                                    
+                                    // For other errors, try to get error message
+                                    let errorMsg = `HTTP ${progressResponse.status}`;
+                                    try {
+                                        const errorData = await progressResponse.json();
+                                        errorMsg = errorData.error || errorMsg;
+                                    } catch (e) {
+                                        errorMsg = await progressResponse.text() || errorMsg;
+                                    }
+                                    
+                                    console.error('Progress fetch error:', errorMsg);
+                                    
+                                    // Only stop polling after multiple failures
+                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
+                                    window.progressErrorCount++;
+                                    
+                                    if (window.progressErrorCount >= 5) {
+                                        clearInterval(progressInterval);
+                                        showPageError(
+                                            'Progress Error',
+                                            `Failed to fetch progress: ${errorMsg}`,
+                                            'The calculation may still be running. Please refresh the page and check again.'
+                                        );
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                        return;
+                                    }
+                                    return; // Continue polling on transient errors
                                 }
+                                
+                                // Reset error count on success
+                                window.progressErrorCount = 0;
                                 
                                 const progressData = await progressResponse.json();
                                 
-                                if (progressData.error && progressData.error !== 'Job not found') {
+                                // Handle job not found (might be timing issue)
+                                if (progressData.error === 'Job not found' || progressData.error === 'Job not found - may still be initializing') {
+                                    console.warn('Job not found in store, will retry...');
+                                    // Increment error count but don't fail immediately (allow time for initialization)
+                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
+                                    window.progressErrorCount++;
+                                    
+                                    // Only fail after many retries (32+ seconds at 800ms intervals)
+                                    if (window.progressErrorCount >= 40) {
+                                        clearInterval(progressInterval);
+                                        showPageError(
+                                            'Job Not Found',
+                                            'The calculation job was not found on the server.',
+                                            'Please try submitting the file again.'
+                                        );
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                    }
+                                    return; // Continue polling
+                                }
+                                
+                                if (progressData.error && progressData.error !== 'Job not found' && progressData.error !== 'Job not found - may still be initializing') {
                                     clearInterval(progressInterval);
                                     showPageError(
                                         'Metrics Calculation Failed',
@@ -2751,6 +2820,46 @@
                                 }
                             } catch (progressError) {
                                 console.error('Progress polling error:', progressError);
+                                
+                                // Handle network errors, timeouts, etc.
+                                if (progressError.name === 'AbortError' || progressError.name === 'TimeoutError') {
+                                    console.warn('Progress request timed out, will retry...');
+                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
+                                    window.progressErrorCount++;
+                                    
+                                    // Only fail after many timeouts (40+ seconds)
+                                    if (window.progressErrorCount >= 50) {
+                                        clearInterval(progressInterval);
+                                        showPageError(
+                                            'Connection Timeout',
+                                            'The progress request timed out repeatedly.',
+                                            'The calculation may still be running. Please refresh the page and check again.'
+                                        );
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                    }
+                                    return; // Continue polling
+                                } else if (progressError.name === 'TypeError' && progressError.message.includes('fetch')) {
+                                    // Network error
+                                    console.error('Network error during progress fetch:', progressError);
+                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
+                                    window.progressErrorCount++;
+                                    
+                                    if (window.progressErrorCount >= 10) {
+                                        clearInterval(progressInterval);
+                                        showPageError(
+                                            'Network Error',
+                                            'Failed to connect to the server.',
+                                            'Please check your internet connection and try again.'
+                                        );
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                    }
+                                    return; // Continue polling
+                                } else {
+                                    // Other errors - log and continue
+                                    console.error('Unexpected error during progress polling:', progressError);
+                                }
                             }
                         }, 800);  // Increased polling interval to 800ms
                     } else {

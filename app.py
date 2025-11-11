@@ -619,17 +619,20 @@ def evaluate_single_hierarchy():
         # Initialize progress tracking
         import uuid
         job_id = str(uuid.uuid4())
+        
+        # Initialize progress store entry immediately to avoid race condition
         with progress_lock:
             hierarchy_progress_store[job_id] = {
-                'progress': 0,
+                'progress': 5,
                 'status': 'Initializing...',
                 'complete': False,
-                'error': None
+                'error': None,
+                'results': None
             }
         
         # Progress callback with time-based throttling for efficiency
         last_update_time = [0]
-        last_progress = [0]
+        last_progress = [5]  # Start at 5 since we initialized at 5%
         MIN_UPDATE_INTERVAL = 0.5  # Update at most every 500ms
         MIN_PROGRESS_DIFF = 3.0  # Update only if progress changed by at least 3%
         
@@ -855,13 +858,30 @@ def get_hierarchy_progress(job_id):
     try:
         with progress_lock:
             if job_id not in hierarchy_progress_store:
-                return jsonify({'error': 'Job not found'}), 404
+                # Return 200 with error message instead of 404 to allow retry logic
+                # This can happen if polling starts before job is initialized (should be rare now)
+                print(f"[PROGRESS] Job {job_id} not found in store (may still be initializing)")
+                return jsonify({
+                    'error': 'Job not found',
+                    'progress': 0,
+                    'status': 'Job not found - may still be initializing',
+                    'complete': False
+                }), 200
             
             progress_data = hierarchy_progress_store[job_id].copy()
             # Include results if complete (already in copy, but ensure it's properly included)
             return jsonify(progress_data)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[PROGRESS] Error fetching progress for job {job_id}: {e}")
+        print(f"[PROGRESS] Traceback: {error_details}")
+        return jsonify({
+            'error': str(e),
+            'progress': 0,
+            'status': f'Error: {str(e)}',
+            'complete': False
+        }), 500
 
 
 @app.route('/api/test')
