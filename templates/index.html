@@ -288,12 +288,19 @@
         }
         
         .section-title {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             font-weight: 600;
             color: var(--text-primary);
             padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--card-border);
-            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 0.75rem;
+            color: var(--primary-color);
         }
         
         /* Metric Cards */
@@ -303,9 +310,13 @@
             border-radius: 0.75rem;
             padding: 1.75rem 1.5rem;
             transition: all 0.3s ease;
+            min-height: 200px;
             height: 100%;
             position: relative;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         
         .metric-card::before {
@@ -350,6 +361,7 @@
             background: rgba(59, 130, 246, 0.1);
             border-radius: 12px;
             transition: all 0.3s ease;
+            flex-shrink: 0;
         }
         
         .metric-card:hover .metric-icon-wrapper {
@@ -363,20 +375,32 @@
             margin: 0.75rem 0;
             letter-spacing: -0.025em;
             line-height: 1.2;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .metric-label {
             color: var(--text-secondary);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             font-weight: 600;
             margin-bottom: 0.5rem;
+            min-height: 2.5em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
         
         .metric-card small {
             color: var(--text-muted);
             font-size: 0.75rem;
+            line-height: 1.4;
+            flex-shrink: 0;
+            margin-top: auto;
         }
         
         .metric-excellent { color: var(--success-color); }
@@ -592,6 +616,15 @@
             margin: 0 auto;
         }
         
+        .progress-container {
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -673,15 +706,146 @@
         .text-muted {
             color: var(--text-muted) !important;
         }
+        
+        /* Professional Progress Bar Animations */
+        @keyframes shine {
+            0% {
+                left: -100%;
+            }
+            50% {
+                left: 100%;
+            }
+            100% {
+                left: 100%;
+            }
+        }
+        
+        @keyframes gradientMove {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(0.9);
+            }
+        }
+        
+        @keyframes progressGlow {
+            0%, 100% {
+                box-shadow: 0 0 15px rgba(79, 141, 245, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1);
+            }
+            50% {
+                box-shadow: 0 0 25px rgba(79, 141, 245, 0.7), inset 0 0 30px rgba(255, 255, 255, 0.2);
+            }
+        }
+        
+        /* Animation handled in CSS class */
+        
+        .progress-wrapper {
+            animation: fadeIn 0.4s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .progress-bar {
+            border-radius: 16px;
+        }
+        
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 60%);
+            border-radius: 16px;
+            pointer-events: none;
+        }
+        
+        .status-dots {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .status-dots .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            animation: pulse 1.4s infinite;
+        }
+        
+        .progress-bar.animating {
+            background-position: 0% 50%;
+            animation: gradientMove 4s ease infinite, progressGlow 2.5s ease-in-out infinite;
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            .progress-bar,
+            .progress-shine,
+            .status-dots .dot {
+                animation: none !important;
+                transition: width 0.3s ease !important;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
-        <div class="text-center">
+        <div class="text-center" style="max-width: 500px; margin: 0 auto;">
             <div class="spinner mb-3"></div>
-            <h3>Evaluating Model...</h3>
-            <p>Processing validation and metrics calculation</p>
+            <h3 id="loadingTitle">Evaluating Model...</h3>
+            <p id="loadingMessage">Processing validation and metrics calculation</p>
+            <!-- Progress Bar -->
+            <div class="progress-container mt-4" style="display: none;" id="progressContainer">
+                <div class="progress-wrapper" style="position: relative; width: 100%; max-width: 500px; margin: 0 auto;">
+                    <div class="progress" style="height: 36px; background: var(--card-bg); border-radius: 18px; overflow: hidden; border: 2px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1); position: relative;">
+                        <div class="progress-bar" 
+                             id="progressBar" 
+                             role="progressbar" 
+                             style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 50%, var(--primary-color) 100%); background-size: 200% 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; border-radius: 16px;"
+                             aria-valuenow="0" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            <div class="progress-shine" style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shine 3s infinite;"></div>
+                            <span id="progressText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; color: white; font-size: 0.95rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 10; letter-spacing: 0.5px; white-space: nowrap;">0%</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div id="progressStatus" style="color: var(--text-primary); font-size: 0.95rem; font-weight: 500; min-height: 28px; display: flex; align-items: center; justify-content: center;">
+                            <span class="status-dots">
+                                <span class="dot"></span>
+                            </span>
+                            <span style="margin-left: 8px;">Initializing...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -698,8 +862,11 @@
                 <button class="nav-link active" id="codeAssignmentTab" data-bs-toggle="tab" data-bs-target="#codeAssignment" type="button" role="tab" style="background: transparent; border: none; color: var(--text-primary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
                     <i class="fas fa-code me-2"></i>Code Assignment
                 </button>
-                <button class="nav-link" id="hierarchyTab" data-bs-toggle="tab" data-bs-target="#hierarchy" type="button" role="tab" style="background: transparent; border: none; color: var(--text-secondary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
-                    <i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation
+                <button class="nav-link" id="singleHierarchyTab" data-bs-toggle="tab" data-bs-target="#singleHierarchy" type="button" role="tab" style="background: transparent; border: none; color: var(--text-secondary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
+                    <i class="fas fa-chart-line me-2"></i>Hierarchy Metrics
+                </button>
+                <button class="nav-link" id="hierarchyComparisonTab" data-bs-toggle="tab" data-bs-target="#hierarchyComparison" type="button" role="tab" style="background: transparent; border: none; color: var(--text-secondary); padding: 1rem 2rem; font-weight: 500; cursor: pointer;">
+                    <i class="fas fa-sitemap me-2"></i>Hierarchy Comparison
                 </button>
             </div>
         </div>
@@ -1073,10 +1240,234 @@
             </div>
             <!-- End Code Assignment Tab -->
 
-            <!-- Hierarchy Evaluation Tab -->
-            <div class="tab-pane fade" id="hierarchy" role="tabpanel">
+            <!-- Single Hierarchy Metrics Tab -->
+            <div class="tab-pane fade" id="singleHierarchy" role="tabpanel">
                 <div class="upload-section">
-                    <h2 class="mb-4"><i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation</h2>
+                    <h2 class="mb-4"><i class="fas fa-chart-line me-2"></i>Hierarchy Metrics</h2>
+                    <p class="text-muted mb-4">Calculate semantic metrics for a single hierarchy XML file.</p>
+                    
+                    <div class="row g-4">
+                        <div class="col-md-12">
+                            <h3 class="mb-3"><i class="fas fa-file-code me-2"></i>Upload Hierarchy XML</h3>
+                            <div class="upload-area" id="singleHierarchyUpload" style="max-width: 600px; margin: 0 auto;">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h4>Drag & Drop Hierarchy XML</h4>
+                                <p class="text-muted">or click to browse</p>
+                                <input type="file" id="singleHierarchyInput" accept=".xml" style="display: none;">
+                                <div id="singleHierarchyInfo" class="mt-3" style="display: none;">
+                                    <span class="badge bg-primary fs-6">
+                                        <i class="fas fa-file-code me-2"></i><span id="singleHierarchyFileName"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button class="btn btn-evaluate text-white" id="evaluateSingleHierarchyBtn" disabled>
+                            <i class="fas fa-calculator me-2"></i>Calculate Metrics
+                        </button>
+                    </div>
+                </div>
+
+                <div class="results-section" id="singleHierarchyResultsSection" style="display: none;">
+                    <div class="results-header mb-5">
+                        <h2 class="mb-2"><i class="fas fa-chart-bar me-2"></i>Hierarchy Metrics Results</h2>
+                    </div>
+
+                    <div class="section-group mb-5">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-chart-bar me-2"></i>Semantic Metrics
+                        </h3>
+                        
+                        <!-- Row 1: Core Similarity & Coherence Metrics -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-magnet fa-2x" style="color: var(--primary-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Embedding Coherence</div>
+                                    <div class="metric-value" id="singleEmbeddingCoherence">-</div>
+                                    <small class="text-muted">Within subtopics (≥0.75 good)</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-sitemap fa-2x" style="color: var(--success-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Parent–Child Similarity</div>
+                                    <div class="metric-value" id="singleParentChildSimilarity">-</div>
+                                    <small class="text-muted">Mean cosine similarity</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-filter fa-2x" style="color: var(--success-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Net Purity (Content)</div>
+                                    <div class="metric-value" id="singleNetPurity">-</div>
+                                    <small class="text-muted">Parent label vs child documents</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center metric-primary">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-star fa-2x" style="color: var(--warning-color);"></i>
+                                    </div>
+                                    <div class="metric-label">Composite Quality Score</div>
+                                    <div class="metric-value" id="singleCompositeQualityScore">-</div>
+                                    <small class="text-muted">Overall hierarchy quality (0-1)</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Row 2: Diversity & Duplication Metrics -->
+                        <div class="row g-4">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-layer-group fa-2x" style="color: var(--accent-purple-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Intra-Level Diversity</div>
+                                    <div class="metric-value" id="singleIntraLevelDiversity">-</div>
+                                    <small class="text-muted">1 - mean cosine (higher=better)</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-chart-area fa-2x" style="color: var(--accent-indigo);"></i>
+                                    </div>
+                                    <div class="metric-label">Inter-Level Granularity</div>
+                                    <div class="metric-value" id="singleInterLevelGranularity">-</div>
+                                    <small class="text-muted">Parent-child - Sibling Δ</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--warning-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Local Duplicate Penalty</div>
+                                    <div class="metric-value" id="singleLocalDuplicatePenalty">-</div>
+                                    <small class="text-muted">Sibling pairs >0.85 (≤0.10 good)</small>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="metric-card text-center">
+                                    <div class="metric-icon-wrapper">
+                                        <i class="fas fa-exclamation-circle fa-2x" style="color: var(--danger-light);"></i>
+                                    </div>
+                                    <div class="metric-label">Global Duplicate Penalty</div>
+                                    <div class="metric-value" id="singleGlobalDuplicatePenalty">-</div>
+                                    <small class="text-muted">Level pairs >0.85 (≤0.15 good)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-group mb-5">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-info-circle me-2"></i>Hierarchy Statistics
+                        </h3>
+                        <div class="row g-4">
+                            <div class="col-md-12">
+                                <div class="chart-container">
+                                    <h4 class="mb-3">Hierarchy Tree</h4>
+                                    <div id="singleHierarchyTree" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 1.5rem; min-height: 400px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-4 mt-3">
+                            <div class="col-md-4">
+                                <div class="metric-card text-center">
+                                    <div class="metric-label">Total Codes</div>
+                                    <div class="metric-value" id="singleTotalCodes">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card text-center">
+                                    <div class="metric-label">Max Depth</div>
+                                    <div class="metric-value" id="singleMaxDepth">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card text-center">
+                                    <div class="metric-label">Codes with Documents</div>
+                                    <div class="metric-value" id="singleCodesWithDocuments">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Coverage Statistics Section -->
+                    <div class="section-group mb-5" id="coverageStatsSection" style="display: none;">
+                        <h3 class="section-title mb-4">
+                            <i class="fas fa-chart-pie me-2"></i>Data Coverage Statistics
+                        </h3>
+                        <div class="row g-4">
+                            <div class="col-md-12">
+                                <div class="chart-container">
+                                    <p class="text-muted mb-3">These statistics show what fraction of the hierarchy was included in each metric calculation.</p>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Codes with Descriptions</div>
+                                                <div class="metric-value" id="coverageDescriptions" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Required for label-based metrics</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Codes with Documents</div>
+                                                <div class="metric-value" id="coverageDocuments" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Required for content-based metrics</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Coherence Coverage</div>
+                                                <div class="metric-value" id="coverageCoherence" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Codes with 2+ documents (single-doc excluded)</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Parent-Child Coverage</div>
+                                                <div class="metric-value" id="coverageParentChild" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Pairs with both descriptions</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Net Purity Coverage</div>
+                                                <div class="metric-value" id="coverageNetPurity" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Pairs with parent label + child documents</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="metric-card">
+                                                <div class="metric-label">Single-Document Codes</div>
+                                                <div class="metric-value" id="coverageSingleDoc" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Excluded from coherence (always = 1.0)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hierarchy Comparison Tab -->
+            <div class="tab-pane fade" id="hierarchyComparison" role="tabpanel">
+                <div class="upload-section">
+                    <h2 class="mb-4"><i class="fas fa-sitemap me-2"></i>Hierarchy Comparison</h2>
+                    <p class="text-muted mb-4">Compare two hierarchy XML files side-by-side (structure visualization only).</p>
                     
                     <div class="row g-4">
                         <!-- Benchmark Upload -->
@@ -1115,7 +1506,7 @@
                     <!-- Evaluate Button -->
                     <div class="text-center mt-4">
                         <button class="btn btn-evaluate text-white" id="evaluateHierarchyBtn" disabled>
-                            <i class="fas fa-chart-line me-2"></i>Evaluate Hierarchy
+                            <i class="fas fa-balance-scale me-2"></i>Compare Hierarchies
                         </button>
                     </div>
                 </div>
@@ -1123,149 +1514,25 @@
                 <!-- Hierarchy Results Section -->
                 <div class="results-section" id="hierarchyResultsSection" style="display: none;">
                     <div class="results-header mb-5">
-                        <h2 class="mb-2"><i class="fas fa-sitemap me-2"></i>Hierarchy Evaluation Results</h2>
+                        <h2 class="mb-2"><i class="fas fa-sitemap me-2"></i>Hierarchy Comparison</h2>
                     </div>
 
-                    <!-- Comparison Metrics -->
+                    <!-- Side-by-Side Hierarchy Trees -->
                     <div class="section-group mb-5">
                         <h3 class="section-title mb-4">
-                            <i class="fas fa-chart-bar me-2"></i>Comparison Metrics
-                        </h3>
-                        <div class="row g-4">
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-project-diagram fa-2x" style="color: var(--primary-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Node Similarity</div>
-                                    <div class="metric-value" id="nodeSimilarity">-</div>
-                                    <small class="text-muted">Semantic alignment</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-code-branch fa-2x" style="color: var(--success-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Tree Edit Distance</div>
-                                    <div class="metric-value" id="treeEditDistance">-</div>
-                                    <small class="text-muted">Structural differences</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-link fa-2x" style="color: var(--warning-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Ancestor Agreement</div>
-                                    <div class="metric-value" id="ancestorAgreement">-</div>
-                                    <small class="text-muted">Relation preservation</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-route fa-2x" style="color: var(--accent-purple-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Path Jaccard</div>
-                                    <div class="metric-value" id="pathJaccard">-</div>
-                                    <small class="text-muted">Path overlap</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-4 mt-2">
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-sitemap fa-2x" style="color: var(--accent-indigo);"></i>
-                                    </div>
-                                    <div class="metric-label">Δ Coherence</div>
-                                    <div class="metric-value" id="deltaCoherence">-</div>
-                                    <small class="text-muted">Model - Benchmark</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-layer-group fa-2x" style="color: var(--warning-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Δ Overlap</div>
-                                    <div class="metric-value" id="deltaOverlap">-</div>
-                                    <small class="text-muted">Human - Model</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-chart-area fa-2x" style="color: var(--success-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Δ Granularity</div>
-                                    <div class="metric-value" id="deltaGranularity">-</div>
-                                    <small class="text-muted">Model - Benchmark</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-link fa-2x" style="color: var(--primary-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Δ Consistency</div>
-                                    <div class="metric-value" id="deltaConsistency">-</div>
-                                    <small class="text-muted">Model - Benchmark</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-4 mt-2">
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card metric-primary text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-star fa-2x" style="color: var(--primary-light);"></i>
-                                    </div>
-                                    <div class="metric-label">HQI</div>
-                                    <div class="metric-value" id="hqi">-</div>
-                                    <small class="text-muted">Quality index</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hierarchy Statistics -->
-                    <div class="section-group mb-5">
-                        <h3 class="section-title mb-4">
-                            <i class="fas fa-info-circle me-2"></i>Hierarchy Statistics
+                            <i class="fas fa-sitemap me-2"></i>Hierarchy Structures
                         </h3>
                         <div class="row g-4">
                             <div class="col-md-6">
                                 <div class="chart-container">
                                     <h4 class="mb-3">Benchmark Hierarchy</h4>
-                                    <div id="benchmarkStats"></div>
+                                    <div id="benchmarkTree" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 1.5rem; min-height: 400px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);"></div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="chart-container">
                                     <h4 class="mb-3">Model Hierarchy</h4>
-                                    <div id="modelStats"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hierarchy Visualization -->
-                    <div class="section-group mb-5">
-                        <h3 class="section-title mb-4">
-                            <i class="fas fa-sitemap me-2"></i>Hierarchy Visualization
-                        </h3>
-                        <div class="row g-4">
-                            <div class="col-md-6">
-                                <div class="chart-container">
-                                    <h4 class="mb-3">Benchmark</h4>
-                                    <div id="benchmarkTree" style="min-height: 400px; overflow: auto;"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="chart-container">
-                                    <h4 class="mb-3">Model</h4>
-                                    <div id="modelTree" style="min-height: 400px; overflow: auto;"></div>
+                                    <div id="modelTree" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 1.5rem; min-height: 400px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);"></div>
                                 </div>
                             </div>
                         </div>
@@ -1353,77 +1620,166 @@
             formData.append('file', selectedFile);
             formData.append('benchmark', selectedBenchmark);
 
-            document.getElementById('loadingOverlay').classList.add('active');
+            // Show loading overlay with progress bar
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingTitle = document.getElementById('loadingTitle');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            loadingOverlay.classList.add('active');
+            loadingTitle.textContent = 'Evaluating Model...';
+            loadingMessage.textContent = 'Comparing model output against benchmark';
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.setAttribute('aria-valuenow', '0');
+            progressText.textContent = '0%';
+            updateProgressStatus('Initializing...');
 
-            // Add timeout controller (2 minutes for large files)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds
+            let jobId = null;
+            let progressInterval = null;
 
             try {
-                console.log('[DEBUG] Starting fetch request...');
                 const response = await fetch('/api/evaluate', {
                     method: 'POST',
-                    body: formData,
-                    signal: controller.signal
+                    body: formData
                 });
 
-                clearTimeout(timeoutId);
-                console.log('[DEBUG] Response received, status:', response.status);
-                console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
-                
-                // Check content size from header
-                const contentSize = response.headers.get('X-Content-Size') || response.headers.get('Content-Length');
-                if (contentSize) {
-                    console.log('[DEBUG] Response size:', contentSize, 'bytes');
-                }
-
-                console.log('[DEBUG] Starting JSON parse...');
-                let data;
-                
-                // Try to parse JSON response
-                try {
-                    const responseText = await response.text();
-                    data = JSON.parse(responseText);
-                } catch (parseError) {
-                    // If JSON parse fails, response might be HTML or plain text
-                    if (!response.ok) {
-                        showPageError(
-                            `Server Error: ${response.status} ${response.statusText}`,
-                            'The server returned an error. Please check your file and try again.',
-                            'Verify your XML file matches the benchmark format and try again.'
-                        );
-                        return;
-                    }
-                    throw parseError;
-                }
-                
-                console.log('[DEBUG] JSON parse complete');
-                console.log('[DEBUG] Response keys:', Object.keys(data));
-                console.log('[DEBUG] Response size:', JSON.stringify(data).length, 'bytes');
+                const data = await response.json();
 
                 if (!response.ok || data.error) {
-                    // Display detailed error message on page
                     showPageError(
-                        data.error || `Server Error: ${response.status} ${response.statusText}`,
+                        data.error || 'Evaluation Failed',
                         data.message || 'An error occurred during evaluation.',
                         data.suggestion || 'Please check your file format and try again.'
                     );
+                    progressContainer.style.display = 'none';
+                    loadingOverlay.classList.remove('active');
                     return;
                 }
 
-                try {
-                    displayResults(data);
-                } catch (displayError) {
-                    console.error('[ERROR] displayResults failed:', displayError);
+                // Start polling for progress (job_id should always be provided)
+                if (data.job_id) {
+                    jobId = data.job_id;
+                    let evaluationResults = null;
+                    
+                    progressInterval = setInterval(async () => {
+                        try {
+                            const progressResponse = await fetch(`/api/evaluation-progress/${jobId}`);
+                            if (!progressResponse.ok) {
+                                clearInterval(progressInterval);
+                                showPageError(
+                                    'Progress Error',
+                                    'Failed to fetch progress',
+                                    'Please try again.'
+                                );
+                                progressContainer.style.display = 'none';
+                                loadingOverlay.classList.remove('active');
+                                return;
+                            }
+                            
+                            const progressData = await progressResponse.json();
+                            
+                            if (progressData.error && progressData.error !== 'Job not found') {
+                                clearInterval(progressInterval);
+                                showPageError(
+                                    'Evaluation Failed',
+                                    progressData.error,
+                                    'Please check your files and try again.'
+                                );
+                                progressContainer.style.display = 'none';
+                                loadingOverlay.classList.remove('active');
+                                return;
+                            }
+                            
+                            // Update progress bar with smooth animation
+                            const progress = Math.min(100, Math.max(0, progressData.progress || 0));
+                            const roundedProgress = Math.round(progress);
+                            
+                            // Smooth width transition
+                            progressBar.style.width = `${progress}%`;
+                            progressBar.setAttribute('aria-valuenow', progress);
+                            progressText.textContent = `${roundedProgress}%`;
+                            
+                            // Update status with animation
+                            updateProgressStatus(progressData.status || 'Processing...');
+                            
+                            // Add glow effect when progress is active
+                            if (progress > 0 && progress < 100) {
+                                progressBar.classList.add('animating');
+                            } else {
+                                progressBar.classList.remove('animating');
+                            }
+                            
+                            // If complete, stop polling and display results
+                            if (progressData.complete) {
+                                clearInterval(progressInterval);
+                                
+                                if (progressData.error) {
+                                    showPageError(
+                                        'Evaluation Failed',
+                                        progressData.error,
+                                        'Please check your files and try again.'
+                                    );
+                                    progressContainer.style.display = 'none';
+                                    loadingOverlay.classList.remove('active');
+                                } else if (progressData.results) {
+                                    // Store results and show completion
+                                    evaluationResults = progressData.results;
+                                    // Small delay to show 100% before hiding
+                                    setTimeout(() => {
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                        displayResults(evaluationResults);
+                                    }, 500);
+                                } else {
+                                    // Complete but no results yet (shouldn't happen)
+                                    progressStatus.textContent = 'Waiting for results...';
+                                    // Poll a few more times for results
+                                    let retryCount = 0;
+                                    const retryInterval = setInterval(async () => {
+                                        retryCount++;
+                                        const retryResponse = await fetch(`/api/evaluation-progress/${jobId}`);
+                                        const retryData = await retryResponse.json();
+                                        if (retryData.results) {
+                                            clearInterval(retryInterval);
+                                            progressContainer.style.display = 'none';
+                                            loadingOverlay.classList.remove('active');
+                                            displayResults(retryData.results);
+                                        } else if (retryCount > 10) {
+                                            clearInterval(retryInterval);
+                                            showPageError(
+                                                'Results Not Available',
+                                                'Evaluation completed but results are not available.',
+                                                'Please try again.'
+                                            );
+                                            progressContainer.style.display = 'none';
+                                            loadingOverlay.classList.remove('active');
+                                        }
+                                    }, 1000);
+                                }
+                            }
+                        } catch (progressError) {
+                            console.error('Progress polling error:', progressError);
+                            // Continue polling even if one request fails
+                        }
+                    }, 800); // Poll every 800ms (reduced frequency for efficiency)
+                } else {
+                    // No job_id - fallback (shouldn't happen with new implementation)
                     showPageError(
-                        'Display Error',
-                        displayError.message,
-                        'Check browser console for details. The data may be corrupted or incomplete.'
+                        'Evaluation Error',
+                        'Job ID not received from server',
+                        'Please try again.'
                     );
-                    throw displayError; // Re-throw to trigger catch block
+                    progressContainer.style.display = 'none';
+                    loadingOverlay.classList.remove('active');
                 }
             } catch (error) {
-                clearTimeout(timeoutId);
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                }
                 let errorTitle = 'Evaluation Failed';
                 let errorMsg = '';
                 let suggestion = '';
@@ -1446,6 +1802,10 @@
             } finally {
                 // Always remove loading overlay, even on error
                 const loadingOverlay = document.getElementById('loadingOverlay');
+                const progressContainer = document.getElementById('progressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'none';
+                }
                 if (loadingOverlay) {
                     loadingOverlay.classList.remove('active');
                     console.log('[DEBUG] Loading overlay removed');
@@ -2195,7 +2555,392 @@
             });
         }
 
-        // ===== Hierarchy Evaluation Tab =====
+        // ===== Single Hierarchy Metrics Tab =====
+        let selectedSingleHierarchyFile = null;
+        
+        // Single Hierarchy File Upload
+        const singleHierarchyUpload = document.getElementById('singleHierarchyUpload');
+        const singleHierarchyInput = document.getElementById('singleHierarchyInput');
+        const singleHierarchyInfo = document.getElementById('singleHierarchyInfo');
+        const singleHierarchyFileName = document.getElementById('singleHierarchyFileName');
+        const evaluateSingleHierarchyBtn = document.getElementById('evaluateSingleHierarchyBtn');
+        
+        if (singleHierarchyUpload && singleHierarchyInput) {
+            singleHierarchyUpload.addEventListener('click', () => singleHierarchyInput.click());
+            singleHierarchyUpload.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                singleHierarchyUpload.style.borderColor = 'var(--primary-color)';
+            });
+            singleHierarchyUpload.addEventListener('dragleave', () => {
+                singleHierarchyUpload.style.borderColor = 'var(--card-border)';
+            });
+            singleHierarchyUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                singleHierarchyUpload.style.borderColor = 'var(--card-border)';
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.xml')) {
+                    singleHierarchyInput.files = files;
+                    handleSingleHierarchyFileSelect(files[0]);
+                }
+            });
+            
+            singleHierarchyInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleSingleHierarchyFileSelect(e.target.files[0]);
+                }
+            });
+        }
+        
+        function handleSingleHierarchyFileSelect(file) {
+            selectedSingleHierarchyFile = file;
+            if (singleHierarchyFileName) singleHierarchyFileName.textContent = file.name;
+            if (singleHierarchyInfo) singleHierarchyInfo.style.display = 'block';
+            if (evaluateSingleHierarchyBtn) evaluateSingleHierarchyBtn.disabled = false;
+        }
+        
+        // Single Hierarchy Evaluate Button
+        if (evaluateSingleHierarchyBtn) {
+            evaluateSingleHierarchyBtn.addEventListener('click', async () => {
+                if (!selectedSingleHierarchyFile) return;
+                
+                const formData = new FormData();
+                formData.append('file', selectedSingleHierarchyFile);
+                
+                // Show loading overlay with progress
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                const loadingTitle = document.getElementById('loadingTitle');
+                const loadingMessage = document.getElementById('loadingMessage');
+                const progressContainer = document.getElementById('progressContainer');
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressStatus = document.getElementById('progressStatus');
+                
+                loadingOverlay.classList.add('active');
+                loadingTitle.textContent = 'Calculating Metrics...';
+                loadingMessage.textContent = 'Computing semantic metrics for hierarchy';
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressBar.setAttribute('aria-valuenow', '0');
+                progressText.textContent = '0%';
+                updateProgressStatus('Initializing...');
+                
+                let jobId = null;
+                let progressInterval = null;
+                
+                try {
+                    const response = await fetch('/api/evaluate-single-hierarchy', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok || data.error) {
+                        showPageError(
+                            data.error || 'Metrics Calculation Failed',
+                            data.message || 'An error occurred during metrics calculation.',
+                            data.suggestion || 'Please check your file and try again.'
+                        );
+                        progressContainer.style.display = 'none';
+                        loadingOverlay.classList.remove('active');
+                        return;
+                    }
+                    
+                    // Start polling for progress
+                    if (data.job_id) {
+                        jobId = data.job_id;
+                        let evaluationResults = null;
+                        
+                        progressInterval = setInterval(async () => {
+                            try {
+                                const progressResponse = await fetch(`/api/hierarchy-progress/${jobId}`);
+                                if (!progressResponse.ok) {
+                                    clearInterval(progressInterval);
+                                    showPageError(
+                                        'Progress Error',
+                                        'Failed to fetch progress',
+                                        'Please try again.'
+                                    );
+                                    progressContainer.style.display = 'none';
+                                    loadingOverlay.classList.remove('active');
+                                    return;
+                                }
+                                
+                                const progressData = await progressResponse.json();
+                                
+                                if (progressData.error && progressData.error !== 'Job not found') {
+                                    clearInterval(progressInterval);
+                                    showPageError(
+                                        'Metrics Calculation Failed',
+                                        progressData.error,
+                                        'Please check your file and try again.'
+                                    );
+                                    progressContainer.style.display = 'none';
+                                    loadingOverlay.classList.remove('active');
+                                    return;
+                                }
+                                
+                                // Update progress bar with smooth animation
+                                const progress = Math.min(100, Math.max(0, progressData.progress || 0));
+                                const roundedProgress = Math.round(progress);
+                                
+                                // Smooth width transition
+                                progressBar.style.width = `${progress}%`;
+                                progressBar.setAttribute('aria-valuenow', progress);
+                                progressText.textContent = `${roundedProgress}%`;
+                                
+                                // Update status with animation
+                                updateProgressStatus(progressData.status || 'Processing...');
+                                
+                                // Add glow effect when progress is active
+                                if (progress > 0 && progress < 100) {
+                                    progressBar.classList.add('animating');
+                                } else {
+                                    progressBar.classList.remove('animating');
+                                }
+                                
+                                // If complete, stop polling and display results
+                                if (progressData.complete) {
+                                    clearInterval(progressInterval);
+                                    
+                                    if (progressData.error) {
+                                        showPageError(
+                                            'Metrics Calculation Failed',
+                                            progressData.error,
+                                            'Please check your file and try again.'
+                                        );
+                                        progressContainer.style.display = 'none';
+                                        loadingOverlay.classList.remove('active');
+                                    } else if (progressData.results) {
+                                        evaluationResults = progressData.results;
+                                        console.log('Results received:', evaluationResults);
+                                        setTimeout(() => {
+                                            progressContainer.style.display = 'none';
+                                            loadingOverlay.classList.remove('active');
+                                            displaySingleHierarchyResults(evaluationResults);
+                                        }, 500);
+                                    } else {
+                                        // Complete but no results - might be a timing issue
+                                        console.warn('Job complete but no results found. Progress data:', progressData);
+                                        // Try one more time after a short delay
+                                        setTimeout(async () => {
+                                            try {
+                                                const finalResponse = await fetch(`/api/hierarchy-progress/${jobId}`);
+                                                if (finalResponse.ok) {
+                                                    const finalData = await finalResponse.json();
+                                                    if (finalData.results) {
+                                                        progressContainer.style.display = 'none';
+                                                        loadingOverlay.classList.remove('active');
+                                                        displaySingleHierarchyResults(finalData.results);
+                                                        return;
+                                                    }
+                                                }
+                                            } catch (e) {
+                                                console.error('Final fetch error:', e);
+                                            }
+                                            // If still no results, show error
+                                            showPageError(
+                                                'Results Not Available',
+                                                'Calculation completed but results could not be retrieved.',
+                                                'Please try again.'
+                                            );
+                                            progressContainer.style.display = 'none';
+                                            loadingOverlay.classList.remove('active');
+                                        }, 1000);
+                                    }
+                                }
+                            } catch (progressError) {
+                                console.error('Progress polling error:', progressError);
+                            }
+                        }, 800);  // Increased polling interval to 800ms
+                    } else {
+                        console.error('No job_id received from server');
+                        showPageError(
+                            'Server Error',
+                            'No job ID returned from server.',
+                            'Please try again.'
+                        );
+                        progressContainer.style.display = 'none';
+                        loadingOverlay.classList.remove('active');
+                    }
+                } catch (error) {
+                    console.error('Error in evaluation request:', error);
+                    if (progressInterval) {
+                        clearInterval(progressInterval);
+                    }
+                    showPageError(
+                        'Metrics Calculation Failed',
+                        error.message || 'An unexpected error occurred.',
+                        'Please check your file and try again.'
+                    );
+                    progressContainer.style.display = 'none';
+                    loadingOverlay.classList.remove('active');
+                }
+            });
+        }
+        
+        function displaySingleHierarchyResults(data) {
+            console.log('Displaying results, data:', data);
+            
+            if (!data) {
+                console.error('No data provided to displaySingleHierarchyResults');
+                showPageError(
+                    'No Results',
+                    'No results data was received.',
+                    'Please try again.'
+                );
+                return;
+            }
+            
+            if (!data.success) {
+                console.error('Results indicate failure. Data:', data);
+                const errorMsg = data.error || 'The calculation did not complete successfully.';
+                showPageError(
+                    'Calculation Failed',
+                    errorMsg,
+                    'Please check your file and try again.'
+                );
+                return;
+            }
+            
+            if (!data.metrics) {
+                console.error('No metrics in results. Full data:', data);
+                showPageError(
+                    'No Metrics',
+                    'Metrics were not computed. This might indicate an issue with the hierarchy structure.',
+                    'Please check that your XML file has a valid hierarchy with codes and documents.'
+                );
+                return;
+            }
+            
+            const metrics = data.metrics;
+            console.log('Metrics to display:', metrics);
+            console.log('Metrics keys:', Object.keys(metrics));
+            
+            function formatMetric(value) {
+                if (value === undefined || value === null) return '-';
+                return typeof value === 'number' ? value.toFixed(3) : value;
+            }
+            
+            // Display metrics (with error handling for missing values)
+            try {
+                document.getElementById('singleEmbeddingCoherence').textContent = formatMetric(metrics.embedding_coherence);
+                document.getElementById('singleParentChildSimilarity').textContent = formatMetric(metrics.parent_child_similarity);
+                document.getElementById('singleLocalDuplicatePenalty').textContent = formatMetric(metrics.local_duplicate_penalty);
+                document.getElementById('singleGlobalDuplicatePenalty').textContent = formatMetric(metrics.global_duplicate_penalty);
+                document.getElementById('singleIntraLevelDiversity').textContent = formatMetric(metrics.intra_level_diversity);
+                document.getElementById('singleInterLevelGranularity').textContent = formatMetric(metrics.inter_level_granularity);
+                document.getElementById('singleNetPurity').textContent = formatMetric(metrics.net_purity);
+                document.getElementById('singleCompositeQualityScore').textContent = formatMetric(metrics.composite_quality_score);
+            } catch (metricError) {
+                console.error('Error displaying metrics:', metricError);
+                console.error('Metrics object:', metrics);
+            }
+            
+            // Display statistics
+            try {
+                document.getElementById('singleTotalCodes').textContent = metrics.total_codes || '-';
+                document.getElementById('singleMaxDepth').textContent = metrics.max_depth || '-';
+                document.getElementById('singleCodesWithDocuments').textContent = metrics.codes_with_documents || '-';
+            } catch (statError) {
+                console.error('Error displaying statistics:', statError);
+            }
+            
+            // Display coverage statistics if available
+            try {
+                if (metrics.coverage_stats) {
+                    const cov = metrics.coverage_stats;
+                    const coverageSection = document.getElementById('coverageStatsSection');
+                    
+                    if (coverageSection) {
+                        const descEl = document.getElementById('coverageDescriptions');
+                        const docsEl = document.getElementById('coverageDocuments');
+                        const cohEl = document.getElementById('coverageCoherence');
+                        const pcEl = document.getElementById('coverageParentChild');
+                        const npEl = document.getElementById('coverageNetPurity');
+                        const sdEl = document.getElementById('coverageSingleDoc');
+                        
+                        if (descEl) descEl.textContent = 
+                            `${cov.codes_with_descriptions || 0} / ${cov.total_codes || 0} (${formatMetric((cov.description_coverage || 0) * 100)}%)`;
+                        if (docsEl) docsEl.textContent = 
+                            `${cov.codes_with_documents || 0} / ${cov.total_codes || 0} (${formatMetric((cov.document_coverage || 0) * 100)}%)`;
+                        if (cohEl) cohEl.textContent = 
+                            `${formatMetric((cov.coherence_coverage || 0) * 100)}%`;
+                        if (pcEl) pcEl.textContent = 
+                            `${formatMetric((cov.parent_child_coverage || 0) * 100)}%`;
+                        if (npEl) npEl.textContent = 
+                            `${formatMetric((cov.net_purity_coverage || 0) * 100)}%`;
+                        if (sdEl) sdEl.textContent = 
+                            `${cov.single_document_codes || 0} codes`;
+                        
+                        // Show coverage section
+                        coverageSection.style.display = 'block';
+                    }
+                }
+            } catch (covError) {
+                console.error('Error displaying coverage stats:', covError);
+            }
+            
+            // Display tree
+            try {
+                if (data.tree) {
+                    displayTree('singleHierarchyTree', data.tree);
+                }
+            } catch (treeError) {
+                console.error('Error displaying tree:', treeError);
+            }
+            
+            // Ensure tab is active and show results section
+            try {
+                // Activate the single hierarchy tab if not already active
+                const singleHierarchyTab = document.getElementById('singleHierarchyTab');
+                const singleHierarchyPane = document.getElementById('singleHierarchy');
+                
+                if (singleHierarchyTab && singleHierarchyPane) {
+                    // Remove active state from all tabs
+                    document.querySelectorAll('.nav-link').forEach(link => {
+                        link.classList.remove('active');
+                        link.setAttribute('aria-selected', 'false');
+                    });
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.classList.remove('show', 'active');
+                    });
+                    
+                    // Activate single hierarchy tab
+                    singleHierarchyTab.classList.add('active');
+                    singleHierarchyTab.setAttribute('aria-selected', 'true');
+                    singleHierarchyPane.classList.add('show', 'active');
+                }
+                
+                // Show results section
+                const resultsSection = document.getElementById('singleHierarchyResultsSection');
+                if (resultsSection) {
+                    resultsSection.style.display = 'block';
+                    
+                    // Scroll to results after tab is visible
+                    setTimeout(() => {
+                        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        console.log('Results section displayed successfully');
+                    }, 100);
+                } else {
+                    console.error('Results section element not found!');
+                    showPageError(
+                        'Display Error',
+                        'Results section not found in page.',
+                        'Please refresh the page and try again.'
+                    );
+                }
+            } catch (displayError) {
+                console.error('Error showing results section:', displayError);
+                // Try to show results section anyway
+                const resultsSection = document.getElementById('singleHierarchyResultsSection');
+                if (resultsSection) {
+                    resultsSection.style.display = 'block';
+                }
+            }
+        }
+
+        // ===== Hierarchy Comparison Tab =====
         let benchmarkHierarchyFile = null;
         let modelHierarchyFile = null;
 
@@ -2236,7 +2981,7 @@
             btn.disabled = !(benchmarkHierarchyFile && modelHierarchyFile);
         }
 
-        // Evaluate hierarchy
+        // Evaluate hierarchy (simple comparison - no metrics)
         document.getElementById('evaluateHierarchyBtn').addEventListener('click', async () => {
             if (!benchmarkHierarchyFile || !modelHierarchyFile) return;
 
@@ -2244,10 +2989,19 @@
             formData.append('benchmark_file', benchmarkHierarchyFile);
             formData.append('model_file', modelHierarchyFile);
 
-            document.getElementById('loadingOverlay').classList.add('active');
+            // Show loading overlay (simple spinner, no progress bar needed)
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingTitle = document.getElementById('loadingTitle');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const progressContainer = document.getElementById('progressContainer');
+            
+            loadingOverlay.classList.add('active');
+            loadingTitle.textContent = 'Comparing Hierarchies...';
+            loadingMessage.textContent = 'Extracting hierarchy structures';
+            progressContainer.style.display = 'none';
 
             try {
-                const response = await fetch('/api/evaluate-hierarchy', {
+                const response = await fetch('/api/compare-hierarchy', {
                     method: 'POST',
                     body: formData
                 });
@@ -2256,41 +3010,39 @@
 
                 if (!response.ok || data.error) {
                     showPageError(
-                        data.error || 'Hierarchy Evaluation Failed',
-                        data.message || 'An error occurred during hierarchy evaluation.',
+                        data.error || 'Hierarchy Comparison Failed',
+                        data.message || 'An error occurred during hierarchy comparison.',
                         data.suggestion || 'Please check your files and try again.'
                     );
+                    loadingOverlay.classList.remove('active');
                     return;
                 }
 
-                displayHierarchyResults(data);
+                // Display results immediately (no progress polling needed)
+                loadingOverlay.classList.remove('active');
+                displayHierarchyComparison(data);
+                
             } catch (error) {
                 showPageError(
-                    'Hierarchy Evaluation Failed',
+                    'Hierarchy Comparison Failed',
                     error.message || 'An unexpected error occurred.',
                     'Please check your files and try again.'
                 );
-            } finally {
-                document.getElementById('loadingOverlay').classList.remove('active');
+                loadingOverlay.classList.remove('active');
             }
         });
 
-        function displayHierarchyResults(data) {
-            // Hide comparison metrics and statistics sections (only show trees)
-            const comparisonSection = document.querySelector('#hierarchyResultsSection .section-group');
-            if (comparisonSection && comparisonSection.querySelector('.section-title')?.textContent.includes('Comparison')) {
-                comparisonSection.style.display = 'none';
+        function displayHierarchyComparison(data) {
+            if (!data.success) {
+                showPageError(
+                    'Invalid Results',
+                    'The comparison data is invalid or incomplete.',
+                    'Please try again.'
+                );
+                return;
             }
             
-            const statsSection = document.querySelectorAll('#hierarchyResultsSection .section-group');
-            statsSection.forEach(section => {
-                const title = section.querySelector('.section-title');
-                if (title && (title.textContent.includes('Statistics') || title.textContent.includes('Comparison'))) {
-                    section.style.display = 'none';
-                }
-            });
-
-            // Display trees only
+            // Display trees side-by-side
             if (data.benchmark && data.benchmark.tree) {
                 displayTree('benchmarkTree', data.benchmark.tree);
             }
@@ -2306,43 +3058,92 @@
 
         function displayStats(containerId, stats) {
             const container = document.getElementById(containerId);
+            const formatValue = (val) => val !== undefined && val !== null ? val.toFixed(3) : 'N/A';
+            const getCoherenceColor = (val) => val >= 0.75 ? 'text-success' : val >= 0.5 ? 'text-warning' : 'text-danger';
+            const getPenaltyColor = (val) => val <= 0.10 ? 'text-success' : val <= 0.3 ? 'text-warning' : 'text-danger';
+            
             container.innerHTML = `
-                <div class="mb-2"><strong>Total Nodes:</strong> ${stats.total_nodes || 0}</div>
-                <div class="mb-2"><strong>Leaf Nodes:</strong> ${stats.leaf_nodes || 0}</div>
-                <div class="mb-2"><strong>Max Depth:</strong> ${stats.max_depth || 0}</div>
-                <div class="mb-2"><strong>Net Nodes:</strong> ${stats.net_nodes || 0}</div>
-                <div class="mb-2"><strong>Code Nodes:</strong> ${stats.code_nodes || 0}</div>
-                <div class="mb-2"><strong>Avg Branching:</strong> ${stats.avg_branching_factor || 0}</div>
-                <div class="mb-2"><strong>Depth Variance:</strong> ${stats.depth_variance || 0}</div>
+                <div class="mb-3">
+                    <h5 class="mb-3">Structural Stats</h5>
+                    <div class="mb-2"><strong>Total Codes:</strong> ${stats.total_nodes || 0}</div>
+                    <div class="mb-2"><strong>Max Depth:</strong> ${stats.max_depth || 0}</div>
+                    <div class="mb-2"><strong>Codes with Documents:</strong> ${stats.codes_with_documents || 0}</div>
+                </div>
                 ${stats.coherence !== undefined ? `
                     <div class="mt-3 pt-3 border-top" style="border-color: var(--card-border);">
-                        <div class="mb-2"><strong>Coherence:</strong> <span class="${stats.coherence >= 0.75 ? 'text-success' : stats.coherence >= 0.5 ? 'text-warning' : 'text-danger'}">${stats.coherence.toFixed(3)}</span></div>
-                        ${stats.overlap !== undefined ? `<div class="mb-2"><strong>Overlap:</strong> <span class="${stats.overlap <= 0.10 ? 'text-success' : stats.overlap <= 0.3 ? 'text-warning' : 'text-danger'}">${stats.overlap.toFixed(3)}</span></div>` : ''}
-                        ${stats.consistency !== undefined ? `<div class="mb-2"><strong>Consistency:</strong> <span class="${stats.consistency >= 0.15 && stats.consistency <= 0.35 ? 'text-success' : 'text-warning'}">${stats.consistency.toFixed(3)}</span></div>` : ''}
-                        ${stats.granularity ? `
-                            <div class="mb-2"><strong>Granularity:</strong>
-                                ${Object.entries(stats.granularity).map(([level, val]) => 
-                                    `<span class="badge badge-depth-${level} me-1">L${level}: ${val.toFixed(2)}</span>`
-                                ).join('')}
+                        <h5 class="mb-3">Semantic Metrics</h5>
+                        <div class="mb-2">
+                            <strong>Embedding Coherence:</strong> 
+                            <span class="${getCoherenceColor(stats.coherence)}">${formatValue(stats.coherence)}</span>
+                            <small class="text-muted ms-2">(≥0.75 good)</small>
+                        </div>
+                        ${stats.parent_child_similarity !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Parent–Child Similarity:</strong> 
+                                <span>${formatValue(stats.parent_child_similarity)}</span>
                             </div>
                         ` : ''}
-                    </div>
-                ` : ''}
-                ${stats.depth_distribution ? `
-                    <div class="mt-3">
-                        <strong>Depth Distribution:</strong>
-                        <div class="mt-2">
-                            ${Object.entries(stats.depth_distribution).map(([depth, count]) => 
-                                `<span class="badge badge-depth-${depth} me-2">Depth ${depth}: ${count}</span>`
-                            ).join('')}
-                        </div>
+                        ${stats.local_duplicate_penalty !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Local Duplicate Penalty:</strong> 
+                                <span class="${getPenaltyColor(stats.local_duplicate_penalty)}">${formatValue(stats.local_duplicate_penalty)}</span>
+                                <small class="text-muted ms-2">(≤0.10 good)</small>
+                            </div>
+                        ` : ''}
+                        ${stats.global_duplicate_penalty !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Global Duplicate Penalty:</strong> 
+                                <span class="${getPenaltyColor(stats.global_duplicate_penalty)}">${formatValue(stats.global_duplicate_penalty)}</span>
+                                <small class="text-muted ms-2">(≤0.15 good)</small>
+                            </div>
+                        ` : ''}
+                        ${stats.intra_level_diversity !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Intra-Level Diversity:</strong> 
+                                <span>${formatValue(stats.intra_level_diversity)}</span>
+                            </div>
+                        ` : ''}
+                        ${stats.inter_level_granularity !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Inter-Level Granularity:</strong> 
+                                <span>${formatValue(stats.inter_level_granularity)}</span>
+                            </div>
+                        ` : ''}
+                        ${stats.net_purity !== undefined ? `
+                            <div class="mb-2">
+                                <strong>Net Purity:</strong> 
+                                <span>${formatValue(stats.net_purity)}</span>
+                            </div>
+                        ` : ''}
+                        ${stats.composite_quality_score !== undefined ? `
+                            <div class="mb-2 mt-3 pt-3 border-top" style="border-color: var(--card-border);">
+                                <strong>Composite Quality Score:</strong> 
+                                <span class="text-primary" style="font-size: 1.1rem; font-weight: 600;">${formatValue(stats.composite_quality_score)}</span>
+                                <small class="text-muted ms-2">(0-1 scale)</small>
+                            </div>
+                        ` : ''}
                     </div>
                 ` : ''}
             `;
         }
 
+        // Helper function to update progress status with animation
+        function updateProgressStatus(status) {
+            const progressStatus = document.getElementById('progressStatus');
+            if (!progressStatus) return;
+            
+            progressStatus.innerHTML = `
+                <span class="status-dots">
+                    <span class="dot"></span>
+                </span>
+                <span style="margin-left: 8px;">${status}</span>
+            `;
+        }
+        
         function displayTree(containerId, tree) {
             const container = document.getElementById(containerId);
+            if (!container) return;
+            
             container.innerHTML = '';
             
             function renderNode(node, level = 0) {

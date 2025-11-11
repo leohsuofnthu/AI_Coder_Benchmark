@@ -8,8 +8,8 @@ services:
     region: oregon
     plan: free
     branch: main
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --keep-alive 5 --max-requests 1000
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && python download_model.py
+    startCommand: python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180 --keep-alive 5 --max-requests 1000
     envVars:
       - key: SECRET_KEY
         generateValue: true

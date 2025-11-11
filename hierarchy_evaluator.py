@@ -1,10 +1,17 @@
 """
 Hierarchy Evaluation Module
 Extracts hierarchical codebook structures from XML for visual comparison.
+Computes semantic metrics using sentence embeddings.
 """
 
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Set
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+from collections import defaultdict
+import warnings
+warnings.filterwarnings('ignore')
 
 
 class HierarchyNode:
@@ -27,6 +34,566 @@ class HierarchyNode:
             'is_net': self.is_net,
             'children': [child.to_dict() for child in self.children]
         }
+
+
+class HierarchyMetricsEvaluator:
+    """
+    Computes semantic metrics for hierarchical codebook structures.
+    Uses sentence embeddings to evaluate coherence, similarity, diversity, and granularity.
+    """
+    
+    # Model selection: Using all-MiniLM-L6-v2 for CPU efficiency
+    # Alternative: "intfloat/e5-base-v2" (better quality but slower, requires more memory)
+    # Note: all-MiniLM-L6-v2 is ~90MB and 2-5x faster than e5-base on CPU
+    # For production with GPU, consider switching to e5-base-v2 for better embeddings
+    MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+    
+    def __init__(self, progress_callback=None):
+        """
+        Initialize the sentence transformer model (lazy loading).
+        
+        Args:
+            progress_callback: Optional function(progress: float, status: str) to report progress
+        """
+        self.model = None
+        self._model_loaded = False
+        self.progress_callback = progress_callback
+    
+    def _load_model(self):
+        """Lazy load the sentence transformer model."""
+        if not self._model_loaded:
+            try:
+                print("[METRICS] Loading sentence transformer model...")
+                self.model = SentenceTransformer(self.MODEL_NAME)
+                self._model_loaded = True
+                print(f"[METRICS] Model loaded: {self.MODEL_NAME}")
+            except Exception as e:
+                print(f"[METRICS] Error loading model: {e}")
+                raise
+    
+    def _embed_texts(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
+        """Embed a list of texts using the sentence transformer model."""
+        if not texts:
+            return np.array([])
+        self._load_model()
+        # Filter empty texts
+        non_empty_texts = [t for t in texts if t and t.strip()]
+        if not non_empty_texts:
+            return np.array([])
+        embeddings = self.model.encode(
+            non_empty_texts, 
+            batch_size=batch_size,
+            show_progress_bar=False,
+            convert_to_numpy=True
+        )
+        return embeddings
+    
+    def _get_all_nodes(self, root: HierarchyNode) -> List[HierarchyNode]:
+        """Recursively collect all nodes from the tree."""
+        nodes = [root]
+        for child in root.children:
+            nodes.extend(self._get_all_nodes(child))
+        return nodes
+    
+    def _get_nodes_by_level(self, root: HierarchyNode) -> Dict[int, List[HierarchyNode]]:
+        """Group nodes by depth level."""
+        levels = defaultdict(list)
+        
+        def traverse(node, depth):
+            levels[depth].append(node)
+            for child in node.children:
+                traverse(child, depth + 1)
+        
+        traverse(root, root.depth)
+        return dict(levels)
+    
+    def _get_text_safe(self, element, tag: str, default: str = '') -> str:
+        """Safely extract text from XML element."""
+        child = element.find(tag)
+        return child.text if child is not None and child.text else default
+    
+    def _extract_documents(self, xml_path: str) -> Dict[str, List[str]]:
+        """Extract documents per code from XML file."""
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        code_to_documents = defaultdict(list)
+        codebook = {}
+        
+        # Get codebook
+        for codebook_elem in root.findall('.//CodeBook'):
+            for code in codebook_elem.findall('.//CodeBookCode'):
+                key = self._get_text_safe(code, 'CBCKey')
+                if key:
+                    description = self._get_text_safe(code, 'CBCDescription')
+                    desc_norm = (description or '').strip().lower()
+                    if not ("uncoded" in desc_norm and "segment" in desc_norm):
+                        codebook[key] = description
+        
+        # Extract responses and map to codes
+        for question in root.findall('.//Question'):
+            question_type = self._get_text_safe(question, 'QuestionType', '0')
+            if question_type != '0':
+                continue
+            
+            for response in question.findall('.//Response'):
+                verbatim = self._get_text_safe(response, 'DROVerbatim', '').strip()
+                if not verbatim:
+                    continue
+                
+                codes = set()
+                for resp_code in response.findall('.//ResponseCode'):
+                    cbc_key = self._get_text_safe(resp_code, 'DCCBCKey')
+                    if cbc_key and cbc_key in codebook:
+                        codes.add(cbc_key)
+                
+                for code_key in codes:
+                    code_to_documents[code_key].append(verbatim)
+        
+        return dict(code_to_documents)
+    
+    def _update_progress(self, progress: float, status: str):
+        """Update progress if callback is provided."""
+        if self.progress_callback:
+            try:
+                self.progress_callback(progress, status)
+            except Exception:
+                # Silently fail to avoid slowing down evaluation
+                pass
+    
+    def _generate_metrics_summary(self, metrics: Dict) -> Dict:
+        """
+        Generate comprehensive metrics summary with expected ranges and interpretations.
+        
+        Args:
+            metrics: Dictionary of metric values
+            
+        Returns:
+            Dictionary with metric summaries including expected ranges and interpretations
+        """
+        summary = {
+            'embedding_coherence': {
+                'value': metrics['embedding_coherence'],
+                'expected_range': '≥0.75 (good)',
+                'interpretation': 'High coherence (>0.75) indicates tight semantic grouping within topics. Low coherence suggests topics may be too broad or contain unrelated content.',
+                'status': 'good' if metrics['embedding_coherence'] >= 0.75 else 'fair' if metrics['embedding_coherence'] >= 0.6 else 'poor'
+            },
+            'parent_child_similarity': {
+                'value': metrics['parent_child_similarity'],
+                'expected_range': '0.5-0.8 (typical)',
+                'interpretation': 'Measures semantic alignment between parent and child topics. Moderate values (0.5-0.8) indicate proper hierarchical refinement. Too high (>0.9) suggests redundancy; too low (<0.3) suggests weak relationships.',
+                'status': 'good' if 0.5 <= metrics['parent_child_similarity'] <= 0.8 else 'fair' if 0.3 <= metrics['parent_child_similarity'] <= 0.9 else 'poor'
+            },
+            'local_duplicate_penalty': {
+                'value': metrics['local_duplicate_penalty'],
+                'expected_range': '≤0.10 (good)',
+                'interpretation': 'Fraction of sibling pairs with high similarity (>0.85). Low values (<0.1) indicate good separation between sibling topics. High values indicate redundancy among siblings under the same parent.',
+                'status': 'good' if metrics['local_duplicate_penalty'] <= 0.10 else 'fair' if metrics['local_duplicate_penalty'] <= 0.20 else 'poor'
+            },
+            'global_duplicate_penalty': {
+                'value': metrics['global_duplicate_penalty'],
+                'expected_range': '≤0.15 (good)',
+                'interpretation': 'Fraction of topic pairs at the same level with high similarity (>0.85). Low values (<0.15) indicate good level-wide diversity. Higher values suggest redundancy across the entire hierarchy level.',
+                'status': 'good' if metrics['global_duplicate_penalty'] <= 0.15 else 'fair' if metrics['global_duplicate_penalty'] <= 0.25 else 'poor'
+            },
+            'intra_level_diversity': {
+                'value': metrics['intra_level_diversity'],
+                'expected_range': '0.25-0.6 (good)',
+                'interpretation': 'Measures variety across topics at the same hierarchy level. Higher values (0.25-0.6) indicate broader coverage and better separation. Lower values suggest topics are too similar.',
+                'status': 'good' if 0.25 <= metrics['intra_level_diversity'] <= 0.6 else 'fair' if 0.15 <= metrics['intra_level_diversity'] <= 0.7 else 'poor'
+            },
+            'inter_level_granularity': {
+                'value': metrics['inter_level_granularity'],
+                'expected_range': '0.1-0.3 (ideal)',
+                'interpretation': 'Difference between parent-child and sibling similarities. Positive values (0.1-0.3) indicate that deeper levels add meaningful refinement. Negative values suggest siblings are more similar than parent-child, indicating weak hierarchical structure.',
+                'status': 'good' if 0.1 <= metrics['inter_level_granularity'] <= 0.3 else 'fair' if 0.0 <= metrics['inter_level_granularity'] <= 0.4 else 'poor'
+            },
+            'net_purity': {
+                'value': metrics['net_purity'],
+                'expected_range': '0.6-0.9 (good)',
+                'interpretation': 'Content alignment: Semantic cohesion between parent topic labels and child document content. Higher values (0.6-0.9) indicate child documents align well with parent topic semantics. Measures how well actual content fits the parent topic description.',
+                'status': 'good' if 0.6 <= metrics['net_purity'] <= 0.9 else 'fair' if 0.4 <= metrics['net_purity'] <= 0.95 else 'poor'
+            },
+            'net_purity_label': {
+                'value': metrics.get('net_purity_label', metrics.get('parent_child_similarity', 0)),
+                'expected_range': '0.5-0.8 (typical)',
+                'interpretation': 'Structural alignment: Semantic similarity between parent and child topic labels. Same as Parent-Child Similarity, measuring label-to-label relationships in the hierarchy structure.',
+                'status': 'good' if 0.5 <= metrics.get('net_purity_label', 0) <= 0.8 else 'fair' if 0.3 <= metrics.get('net_purity_label', 0) <= 0.9 else 'poor'
+            },
+            'composite_quality_score': {
+                'value': metrics['composite_quality_score'],
+                'expected_range': '0.7-1.0 (excellent), 0.5-0.7 (good), <0.5 (needs improvement)',
+                'interpretation': 'Overall hierarchical quality combining coherence, diversity, and structural relationships. Weighted combination: 30% coherence + 30% (1-duplication) + 20% diversity + 20% parent-child similarity.',
+                'status': 'excellent' if metrics['composite_quality_score'] >= 0.7 else 'good' if metrics['composite_quality_score'] >= 0.5 else 'needs_improvement'
+            }
+        }
+        return summary
+    
+    def compute_metrics(self, root: HierarchyNode, xml_path: str) -> Optional[Dict]:
+        """
+        Compute all semantic metrics for a hierarchy.
+        
+        Returns:
+            Dictionary with metrics or None if computation fails
+        """
+        try:
+            self._update_progress(5, "Extracting documents from XML...")
+            # Extract documents per code
+            code_to_documents = self._extract_documents(xml_path)
+            
+            self._update_progress(10, "Analyzing hierarchy structure...")
+            # Get all nodes
+            all_nodes = self._get_all_nodes(root)
+            if not all_nodes:
+                return None
+            
+            # Filter out virtual root node
+            nodes = [n for n in all_nodes if n.key != 'root']
+            if not nodes:
+                return None
+            
+            # Get nodes by level
+            nodes_by_level = self._get_nodes_by_level(root)
+            max_depth = max(nodes_by_level.keys()) if nodes_by_level else 1
+            
+            # 1. Embedding Coherence (within subtopics)
+            self._update_progress(15, "Loading embedding model...")
+            self._load_model()  # Pre-load model
+            
+            self._update_progress(20, "Embedding code descriptions...")
+            coherence_scores = []
+            code_embeddings = {}
+            document_centroids = {}
+            
+            # Embed code descriptions (batch for efficiency)
+            code_descriptions = [(node.key, node.description or "") for node in nodes if node.description]
+            if code_descriptions:
+                # Batch embed all descriptions at once for better progress tracking
+                descriptions_list = [desc for _, desc in code_descriptions]
+                self._update_progress(25, f"Embedding {len(descriptions_list)} code descriptions...")
+                all_code_embs = self._embed_texts(descriptions_list)
+                
+                # Map embeddings back to codes
+                for idx, (code_key, _) in enumerate(code_descriptions):
+                    if idx < len(all_code_embs):
+                        code_embeddings[code_key] = all_code_embs[idx]
+            else:
+                self._update_progress(25, "No code descriptions to embed...")
+            
+            self._update_progress(40, "Embedding documents and computing coherence...")
+            # Embed documents and compute coherence
+            codes_with_docs = [(key, docs) for key, docs in code_to_documents.items() if docs]
+            single_doc_count = 0
+            multi_doc_count = 0
+            
+            for idx, (code_key, documents) in enumerate(codes_with_docs):
+                if documents:
+                    # Embed documents
+                    doc_embeddings = self._embed_texts(documents)
+                    if len(doc_embeddings) > 0:
+                        # Compute centroid
+                        centroid = np.mean(doc_embeddings, axis=0)
+                        document_centroids[code_key] = centroid
+                        
+                        # Only compute coherence for codes with 2+ documents (single-doc always = 1.0)
+                        if len(doc_embeddings) >= 2:
+                            # Compute coherence: mean cosine similarity between documents and centroid
+                            similarities = cosine_similarity(doc_embeddings, centroid.reshape(1, -1))
+                            coherence = float(np.mean(similarities))
+                            coherence_scores.append(coherence)
+                            multi_doc_count += 1
+                        else:
+                            single_doc_count += 1
+                progress = 40 + ((idx + 1) / len(codes_with_docs)) * 25 if codes_with_docs else 65
+                self._update_progress(progress, f"Processing documents ({idx + 1}/{len(codes_with_docs)})...")
+            
+            embedding_coherence = float(np.mean(coherence_scores)) if coherence_scores else 0.0
+            
+            # 2. Parent-Child Similarity (mean cosine) - using code descriptions
+            self._update_progress(65, "Computing parent-child similarities...")
+            parent_child_similarities = []
+            total_parent_child_pairs = 0
+            for node in nodes:
+                if node.parent and node.parent.key != 'root':
+                    total_parent_child_pairs += 1
+                    if node.key in code_embeddings:
+                        parent_key = node.parent.key
+                        if parent_key in code_embeddings:
+                            parent_emb = code_embeddings[parent_key].reshape(1, -1)
+                            child_emb = code_embeddings[node.key].reshape(1, -1)
+                            sim = cosine_similarity(parent_emb, child_emb)[0][0]
+                            parent_child_similarities.append(float(sim))
+            
+            parent_child_similarity = float(np.mean(parent_child_similarities)) if parent_child_similarities else 0.0
+            parent_child_coverage = len(parent_child_similarities) / total_parent_child_pairs if total_parent_child_pairs > 0 else 0.0
+            
+            # 3. Local Duplication Penalty (fraction of sibling pairs with cosine > 0.85)
+            self._update_progress(70, "Computing local duplication penalty...")
+            local_duplicate_count = 0
+            local_total_pairs = 0
+            local_total_sibling_groups = 0
+            local_groups_with_embeddings = 0
+            sibling_similarities_for_dup = []
+            
+            for level, level_nodes in nodes_by_level.items():
+                if level == 0:
+                    continue
+                siblings_by_parent = defaultdict(list)
+                for node in level_nodes:
+                    if node.parent and node.parent.key != 'root':
+                        siblings_by_parent[node.parent.key].append(node)
+                
+                # Compute duplication for each sibling group (local)
+                for parent_key, siblings in siblings_by_parent.items():
+                    if len(siblings) < 2:
+                        continue
+                    local_total_sibling_groups += 1
+                    sibling_embeddings = []
+                    for sibling in siblings:
+                        if sibling.key in code_embeddings:
+                            sibling_embeddings.append(code_embeddings[sibling.key])
+                    
+                    if len(sibling_embeddings) >= 2:
+                        local_groups_with_embeddings += 1
+                        emb_matrix = np.array(sibling_embeddings)
+                        similarities = cosine_similarity(emb_matrix)
+                        upper_triangle = similarities[np.triu_indices(len(similarities), k=1)]
+                        sibling_similarities_for_dup.extend([float(s) for s in upper_triangle])
+                        local_total_pairs += len(upper_triangle)
+                        local_duplicate_count += sum(1 for s in upper_triangle if s > 0.85)
+            
+            local_duplicate_penalty = local_duplicate_count / local_total_pairs if local_total_pairs > 0 else 0.0
+            local_duplication_coverage = local_groups_with_embeddings / local_total_sibling_groups if local_total_sibling_groups > 0 else 0.0
+            
+            # 4. Global Duplication Penalty (fraction of level-wise topic pairs with cosine > 0.85)
+            self._update_progress(72, "Computing global duplication penalty...")
+            global_duplicate_count = 0
+            global_total_pairs = 0
+            global_total_level_nodes = 0
+            global_levels_with_embeddings = 0
+            
+            for level, level_nodes in nodes_by_level.items():
+                if level == 0 or len(level_nodes) < 2:
+                    continue
+                global_total_level_nodes += len(level_nodes)
+                # Get embeddings for all nodes at this level
+                level_embeddings = []
+                for node in level_nodes:
+                    if node.key in code_embeddings:
+                        level_embeddings.append((node.key, code_embeddings[node.key]))
+                
+                if len(level_embeddings) >= 2:
+                    global_levels_with_embeddings += 1
+                    # Compute pairwise similarities for all nodes at this level
+                    keys, embs = zip(*level_embeddings)
+                    emb_matrix = np.array(embs)
+                    similarities = cosine_similarity(emb_matrix)
+                    upper_triangle = similarities[np.triu_indices(len(similarities), k=1)]
+                    global_total_pairs += len(upper_triangle)
+                    global_duplicate_count += sum(1 for s in upper_triangle if s > 0.85)
+            
+            global_duplicate_penalty = global_duplicate_count / global_total_pairs if global_total_pairs > 0 else 0.0
+            global_duplication_coverage = sum(1 for level, level_nodes in nodes_by_level.items() 
+                                             if level > 0 and len(level_nodes) >= 2 and 
+                                             any(node.key in code_embeddings for node in level_nodes)) / \
+                                         max(1, sum(1 for level, level_nodes in nodes_by_level.items() 
+                                                   if level > 0 and len(level_nodes) >= 2))
+            
+            # 5. Intra-Level Diversity (1 - mean cosine)
+            self._update_progress(75, "Computing intra-level diversity...")
+            level_diversities = []
+            diversity_total_groups = 0
+            diversity_groups_with_embeddings = 0
+            
+            for level, level_nodes in nodes_by_level.items():
+                if level == 0:  # Skip root level
+                    continue
+                # Group siblings by parent
+                siblings_by_parent = defaultdict(list)
+                for node in level_nodes:
+                    if node.parent and node.parent.key != 'root':
+                        siblings_by_parent[node.parent.key].append(node)
+                
+                # Compute diversity for each sibling group
+                for parent_key, siblings in siblings_by_parent.items():
+                    if len(siblings) < 2:
+                        continue
+                    diversity_total_groups += 1
+                    # Get embeddings for siblings
+                    sibling_embeddings = []
+                    for sibling in siblings:
+                        if sibling.key in code_embeddings:
+                            sibling_embeddings.append(code_embeddings[sibling.key])
+                    
+                    if len(sibling_embeddings) >= 2:
+                        diversity_groups_with_embeddings += 1
+                        # Compute pairwise similarities
+                        emb_matrix = np.array(sibling_embeddings)
+                        similarities = cosine_similarity(emb_matrix)
+                        # Get upper triangle (excluding diagonal)
+                        upper_triangle = similarities[np.triu_indices(len(similarities), k=1)]
+                        mean_sim = float(np.mean(upper_triangle))
+                        diversity = 1.0 - mean_sim
+                        level_diversities.append(diversity)
+            
+            intra_level_diversity = float(np.mean(level_diversities)) if level_diversities else 0.0
+            diversity_coverage = diversity_groups_with_embeddings / diversity_total_groups if diversity_total_groups > 0 else 0.0
+            
+            # 6. Inter-Level Differentiation (Granularity Δ) (difference between parent-child and sibling mean)
+            self._update_progress(80, "Computing inter-level granularity...")
+            # Mean sibling similarity (from diversity computation)
+            sibling_similarities = []
+            for level, level_nodes in nodes_by_level.items():
+                if level == 0:
+                    continue
+                siblings_by_parent = defaultdict(list)
+                for node in level_nodes:
+                    if node.parent and node.parent.key != 'root':
+                        siblings_by_parent[node.parent.key].append(node)
+                
+                for parent_key, siblings in siblings_by_parent.items():
+                    if len(siblings) < 2:
+                        continue
+                    sibling_embeddings = []
+                    for sibling in siblings:
+                        if sibling.key in code_embeddings:
+                            sibling_embeddings.append(code_embeddings[sibling.key])
+                    
+                    if len(sibling_embeddings) >= 2:
+                        emb_matrix = np.array(sibling_embeddings)
+                        similarities = cosine_similarity(emb_matrix)
+                        upper_triangle = similarities[np.triu_indices(len(similarities), k=1)]
+                        sibling_similarities.extend([float(s) for s in upper_triangle])
+            
+            mean_sibling_similarity = float(np.mean(sibling_similarities)) if sibling_similarities else 0.0
+            inter_level_granularity = parent_child_similarity - mean_sibling_similarity
+            
+            # 7. Net Purity - Two versions:
+            #    a) Label-to-Content: Parent label vs child documents (content alignment)
+            #    b) Label-to-Label: Parent label vs child label (structural alignment)
+            self._update_progress(85, "Computing net purity...")
+            net_purity_content_scores = []  # Parent label vs child documents
+            net_purity_label_scores = []    # Parent label vs child label
+            total_parent_child_pairs_for_purity = 0
+            
+            for node in nodes:
+                if node.parent and node.parent.key != 'root':
+                    parent_key = node.parent.key
+                    child_key = node.key
+                    total_parent_child_pairs_for_purity += 1
+                    
+                    # Get parent code embedding
+                    if parent_key in code_embeddings:
+                        parent_emb = code_embeddings[parent_key]
+                        
+                        # Version A: Parent label vs child documents (content-based)
+                        if child_key in document_centroids:
+                            child_centroid = document_centroids[child_key]
+                            sim = cosine_similarity(
+                                parent_emb.reshape(1, -1),
+                                child_centroid.reshape(1, -1)
+                            )[0][0]
+                            net_purity_content_scores.append(float(sim))
+                        
+                        # Version B: Parent label vs child label (structural)
+                        if child_key in code_embeddings:
+                            child_emb = code_embeddings[child_key]
+                            sim = cosine_similarity(
+                                parent_emb.reshape(1, -1),
+                                child_emb.reshape(1, -1)
+                            )[0][0]
+                            net_purity_label_scores.append(float(sim))
+            
+            # Use content-based version as primary (original metric)
+            # Label-to-label is same as parent-child similarity, so we'll use content version
+            net_purity = float(np.mean(net_purity_content_scores)) if net_purity_content_scores else 0.0
+            net_purity_label = float(np.mean(net_purity_label_scores)) if net_purity_label_scores else 0.0
+            net_purity_coverage = len(net_purity_content_scores) / total_parent_child_pairs_for_purity if total_parent_child_pairs_for_purity > 0 else 0.0
+            
+            # 8. Composite Hierarchical Quality Score
+            # Q_hier = α*C_embed + β*(1-D_dup) + γ*D_intra + δ*S_pc
+            # Where: C_embed = coherence, D_dup = duplicate penalty (use global), D_intra = diversity, S_pc = parent-child similarity
+            # Weights: α=0.3, β=0.3, γ=0.2, δ=0.2 (normalized to sum to 1.0)
+            self._update_progress(88, "Computing composite quality score...")
+            alpha, beta, gamma, delta = 0.3, 0.3, 0.2, 0.2
+            
+            # Ensure all components are in [0, 1] range before combining
+            coherence_norm = max(0.0, min(1.0, embedding_coherence))
+            duplication_norm = max(0.0, min(1.0, global_duplicate_penalty))
+            diversity_norm = max(0.0, min(1.0, intra_level_diversity))
+            parent_child_norm = max(0.0, min(1.0, parent_child_similarity))
+            
+            composite_score = (
+                alpha * coherence_norm +
+                beta * (1.0 - duplication_norm) +
+                gamma * diversity_norm +
+                delta * parent_child_norm
+            )
+            # Normalize to 0-1 range (already should be, but ensure)
+            composite_score = max(0.0, min(1.0, composite_score))
+            
+            self._update_progress(95, "Finalizing metrics and generating report...")
+            
+            # 9. Generate comprehensive metrics summary
+            metrics_summary = self._generate_metrics_summary({
+                'embedding_coherence': embedding_coherence,
+                'parent_child_similarity': parent_child_similarity,
+                'local_duplicate_penalty': local_duplicate_penalty,
+                'global_duplicate_penalty': global_duplicate_penalty,
+                'intra_level_diversity': intra_level_diversity,
+                'inter_level_granularity': inter_level_granularity,
+                'net_purity': net_purity,
+                'net_purity_label': net_purity_label,
+                'composite_quality_score': composite_score
+            })
+            
+            self._update_progress(100, "Complete!")
+            
+            # Calculate overall coverage statistics
+            codes_with_embeddings = len(code_embeddings)
+            codes_with_docs = len([k for k in code_to_documents.keys() if code_to_documents[k]])
+            codes_with_both = len([k for k in code_embeddings.keys() if k in code_to_documents and code_to_documents[k]])
+            
+            coverage_stats = {
+                'total_codes': len(nodes),
+                'codes_with_descriptions': codes_with_embeddings,
+                'codes_with_documents': codes_with_docs,
+                'codes_with_both': codes_with_both,
+                'description_coverage': codes_with_embeddings / len(nodes) if nodes else 0.0,
+                'document_coverage': codes_with_docs / len(nodes) if nodes else 0.0,
+                'coherence_coverage': multi_doc_count / codes_with_docs if codes_with_docs > 0 else 0.0,
+                'single_document_codes': single_doc_count,
+                'parent_child_coverage': parent_child_coverage,
+                'local_duplication_coverage': local_duplication_coverage,
+                'diversity_coverage': diversity_coverage,
+                'net_purity_coverage': net_purity_coverage
+            }
+            
+            return {
+                'embedding_coherence': round(embedding_coherence, 4),
+                'parent_child_similarity': round(parent_child_similarity, 4),
+                'local_duplicate_penalty': round(local_duplicate_penalty, 4),
+                'global_duplicate_penalty': round(global_duplicate_penalty, 4),
+                'intra_level_diversity': round(intra_level_diversity, 4),
+                'inter_level_granularity': round(inter_level_granularity, 4),
+                'net_purity': round(net_purity, 4),
+                'net_purity_label': round(net_purity_label, 4),  # Label-to-label version
+                'composite_quality_score': round(composite_score, 4),
+                'metrics_summary': metrics_summary,
+                'coverage_stats': coverage_stats,
+                'max_depth': max_depth,
+                'total_codes': len(nodes),
+                'codes_with_documents': codes_with_docs
+            }
+            
+        except Exception as e:
+            self._update_progress(0, f"Error: {str(e)}")
+            error_msg = f"Error computing metrics: {e}"
+            print(f"[METRICS] {error_msg}")
+            import traceback
+            traceback_str = traceback.format_exc()
+            print(f"[METRICS] Traceback:\n{traceback_str}")
+            # Re-raise to be caught by the calling code
+            raise ValueError(f"{error_msg}\n{traceback_str}")
 
 
 class HierarchyEvaluator:
@@ -179,10 +746,69 @@ class HierarchyEvaluator:
         
         return root_nodes
     
-    def evaluate(self) -> Dict:
-        """Extract hierarchy structures for visual comparison."""
+    def extract_documents_per_code(self, xml_path: str) -> Dict[str, List[str]]:
+        """
+        Extract all verbatim documents assigned to each code.
+        Returns mapping: code_key -> List[verbatim_text]
+        """
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        
+        # Map code_key -> list of verbatims
+        code_to_documents = defaultdict(list)
+        
+        # Get codebook to filter out invalid codes
+        codebook = {}
+        for codebook_elem in root.findall('.//CodeBook'):
+            for code in codebook_elem.findall('.//CodeBookCode'):
+                key = self._get_text(code, 'CBCKey')
+                if key:
+                    description = self._get_text(code, 'CBCDescription')
+                    desc_norm = (description or '').strip().lower()
+                    # Skip "Uncoded Segment" placeholder codes
+                    if not ("uncoded" in desc_norm and "segment" in desc_norm):
+                        codebook[key] = description
+        
+        # Extract responses and map to codes
+        for question in root.findall('.//Question'):
+            question_type = self._get_text(question, 'QuestionType', '0')
+            
+            # Only process open-ended questions (QuestionType = 0)
+            if question_type != '0':
+                continue
+            
+            for response in question.findall('.//Response'):
+                verbatim = self._get_text(response, 'DROVerbatim', '').strip()
+                if not verbatim:
+                    continue
+                
+                # Get all codes assigned to this response
+                codes = set()
+                for resp_code in response.findall('.//ResponseCode'):
+                    cbc_key = self._get_text(resp_code, 'DCCBCKey')
+                    if cbc_key and cbc_key in codebook:
+                        codes.add(cbc_key)
+                
+                # Add verbatim to all assigned codes
+                for code_key in codes:
+                    code_to_documents[code_key].append(verbatim)
+        
+        return dict(code_to_documents)
+    
+    def evaluate(self, progress_callback=None) -> Dict:
+        """
+        Extract hierarchy structures for visual comparison.
+        
+        Args:
+            progress_callback: Optional function(progress: float, status: str) to report progress
+        """
+        if progress_callback:
+            progress_callback(2, "Extracting benchmark hierarchy...")
         # Extract hierarchies
         benchmark_roots = self.extract_hierarchy(self.benchmark_path)
+        
+        if progress_callback:
+            progress_callback(4, "Extracting model hierarchy...")
         model_roots = self.extract_hierarchy(self.model_path)
         
         # Convert to single root if multiple roots
@@ -201,11 +827,61 @@ class HierarchyEvaluator:
             virtual_root.children = model_roots
             self.model_tree = virtual_root
         
+        # Compute semantic metrics with progress tracking
+        # Progress is split: 5-50% benchmark, 50-95% model, 95-100% comparison
+        def benchmark_progress(progress, status):
+            # Scale to 5-50% range
+            scaled = 5 + (progress * 0.45)
+            if progress_callback:
+                progress_callback(scaled, f"Benchmark: {status}")
+        
+        def model_progress(progress, status):
+            # Scale to 50-95% range
+            scaled = 50 + (progress * 0.45)
+            if progress_callback:
+                progress_callback(scaled, f"Model: {status}")
+        
+        metrics_evaluator_benchmark = HierarchyMetricsEvaluator(progress_callback=benchmark_progress)
+        benchmark_metrics = metrics_evaluator_benchmark.compute_metrics(
+            self.benchmark_tree, 
+            self.benchmark_path
+        )
+        
+        metrics_evaluator_model = HierarchyMetricsEvaluator(progress_callback=model_progress)
+        model_metrics = metrics_evaluator_model.compute_metrics(
+            self.model_tree,
+            self.model_path
+        )
+        
+        if progress_callback:
+            progress_callback(95, "Computing comparison metrics...")
+        
+        # Compute comparison deltas
+        comparison = {}
+        if benchmark_metrics and model_metrics:
+            comparison = {
+                'delta_coherence': model_metrics.get('embedding_coherence', 0) - benchmark_metrics.get('embedding_coherence', 0),
+                'delta_parent_child': model_metrics.get('parent_child_similarity', 0) - benchmark_metrics.get('parent_child_similarity', 0),
+                'delta_local_duplicate_penalty': benchmark_metrics.get('local_duplicate_penalty', 0) - model_metrics.get('local_duplicate_penalty', 0),
+                'delta_global_duplicate_penalty': benchmark_metrics.get('global_duplicate_penalty', 0) - model_metrics.get('global_duplicate_penalty', 0),
+                'delta_diversity': model_metrics.get('intra_level_diversity', 0) - benchmark_metrics.get('intra_level_diversity', 0),
+                'delta_granularity': model_metrics.get('inter_level_granularity', 0) - benchmark_metrics.get('inter_level_granularity', 0),
+                'delta_net_purity': model_metrics.get('net_purity', 0) - benchmark_metrics.get('net_purity', 0),
+                'delta_net_purity_label': model_metrics.get('net_purity_label', 0) - benchmark_metrics.get('net_purity_label', 0),
+                'delta_composite_quality': model_metrics.get('composite_quality_score', 0) - benchmark_metrics.get('composite_quality_score', 0),
+            }
+        
+        if progress_callback:
+            progress_callback(100, "Complete!")
+        
         return {
             'benchmark': {
-                'tree': self.benchmark_tree.to_dict() if self.benchmark_tree else {}
+                'tree': self.benchmark_tree.to_dict() if self.benchmark_tree else {},
+                'metrics': benchmark_metrics or {}
             },
             'model': {
-                'tree': self.model_tree.to_dict() if self.model_tree else {}
-            }
+                'tree': self.model_tree.to_dict() if self.model_tree else {},
+                'metrics': model_metrics or {}
+            },
+            'comparison': comparison
         }
