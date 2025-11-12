@@ -1,7 +1,7 @@
 """
 Hierarchy Evaluation Module
 Extracts hierarchical codebook structures from XML for visual comparison.
-Computes semantic metrics using sentence embeddings.
+Computes structural hierarchy metrics using sentence embeddings (topic labels only, no document content required).
 """
 
 import xml.etree.ElementTree as ET
@@ -38,8 +38,9 @@ class HierarchyNode:
 
 class HierarchyMetricsEvaluator:
     """
-    Computes semantic metrics for hierarchical codebook structures.
-    Uses sentence embeddings to evaluate coherence, similarity, diversity, and granularity.
+    Computes structural hierarchy metrics for hierarchical codebook structures.
+    Uses sentence embeddings on topic labels to evaluate similarity, diversity, and granularity.
+    Does not require document content - only uses topic descriptions/labels.
     """
     
     # Model selection: Using all-MiniLM-L6-v2 for CPU efficiency
@@ -48,15 +49,37 @@ class HierarchyMetricsEvaluator:
     # For production with GPU, consider switching to e5-base-v2 for better embeddings
     MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
     
-    def __init__(self, progress_callback=None):
+    # Sensitivity configuration for duplication detection
+    # Multiple thresholds for graduated penalties
+    DUPLICATE_THRESHOLD_MODERATE = 0.75  # Moderate similarity - light penalty
+    DUPLICATE_THRESHOLD_HIGH = 0.85      # High similarity - standard penalty (original)
+    DUPLICATE_THRESHOLD_VERY_HIGH = 0.90  # Very high similarity - heavy penalty
+    
+    # Sensitivity configuration for granularity
+    GRANULARITY_MIN_RATIO = 0.05  # Minimum meaningful granularity ratio
+    GRANULARITY_DEPTH_WEIGHT = True  # Weight deeper levels more (they should show more refinement)
+    
+    def __init__(self, progress_callback=None, 
+                 duplicate_threshold_high=0.85,
+                 duplicate_threshold_moderate=0.75,
+                 duplicate_threshold_very_high=0.90,
+                 granularity_depth_weight=True):
         """
         Initialize the sentence transformer model (lazy loading).
         
         Args:
             progress_callback: Deprecated - no longer used (kept for backward compatibility)
+            duplicate_threshold_high: Threshold for high similarity (default 0.85)
+            duplicate_threshold_moderate: Threshold for moderate similarity (default 0.75)
+            duplicate_threshold_very_high: Threshold for very high similarity (default 0.90)
+            granularity_depth_weight: Whether to weight deeper levels more (default True)
         """
         self.model = None
         self._model_loaded = False
+        self.DUPLICATE_THRESHOLD_HIGH = duplicate_threshold_high
+        self.DUPLICATE_THRESHOLD_MODERATE = duplicate_threshold_moderate
+        self.DUPLICATE_THRESHOLD_VERY_HIGH = duplicate_threshold_very_high
+        self.GRANULARITY_DEPTH_WEIGHT = granularity_depth_weight
     
     def _load_model(self):
         """Lazy load the sentence transformer model."""
@@ -159,6 +182,7 @@ class HierarchyMetricsEvaluator:
     def _generate_metrics_summary(self, metrics: Dict) -> Dict:
         """
         Generate comprehensive metrics summary with expected ranges and interpretations.
+        Includes only structural hierarchy metrics (no document content required).
         
         Args:
             metrics: Dictionary of metric values
@@ -167,12 +191,6 @@ class HierarchyMetricsEvaluator:
             Dictionary with metric summaries including expected ranges and interpretations
         """
         summary = {
-            'embedding_coherence': {
-                'value': metrics['embedding_coherence'],
-                'expected_range': '≥0.75 (good)',
-                'interpretation': 'High coherence (>0.75) indicates tight semantic grouping within topics. Low coherence suggests topics may be too broad or contain unrelated content.',
-                'status': 'good' if metrics['embedding_coherence'] >= 0.75 else 'fair' if metrics['embedding_coherence'] >= 0.6 else 'poor'
-            },
             'parent_child_similarity': {
                 'value': metrics['parent_child_similarity'],
                 'expected_range': '0.5-0.8 (typical)',
@@ -181,15 +199,15 @@ class HierarchyMetricsEvaluator:
             },
             'local_duplicate_penalty': {
                 'value': metrics['local_duplicate_penalty'],
-                'expected_range': '≤0.10 (good)',
-                'interpretation': 'Fraction of sibling pairs with high similarity (>0.85). Low values (<0.1) indicate good separation between sibling topics. High values indicate redundancy among siblings under the same parent.',
-                'status': 'good' if metrics['local_duplicate_penalty'] <= 0.10 else 'fair' if metrics['local_duplicate_penalty'] <= 0.20 else 'poor'
+                'expected_range': '≤0.15 (good), weighted penalty',
+                'interpretation': 'Weighted penalty for sibling pairs: moderate (0.75-0.85) = 0.5x, high (0.85-0.90) = 1.0x, very high (>0.90) = 2.0x. More sensitive to near-duplicates. Low values (<0.15) indicate good separation between sibling topics. High values indicate redundancy among siblings under the same parent.',
+                'status': 'good' if metrics['local_duplicate_penalty'] <= 0.15 else 'fair' if metrics['local_duplicate_penalty'] <= 0.30 else 'poor'
             },
             'global_duplicate_penalty': {
                 'value': metrics['global_duplicate_penalty'],
-                'expected_range': '≤0.15 (good)',
-                'interpretation': 'Fraction of topic pairs at the same level with high similarity (>0.85). Low values (<0.15) indicate good level-wide diversity. Higher values suggest redundancy across the entire hierarchy level.',
-                'status': 'good' if metrics['global_duplicate_penalty'] <= 0.15 else 'fair' if metrics['global_duplicate_penalty'] <= 0.25 else 'poor'
+                'expected_range': '≤0.20 (good), weighted penalty',
+                'interpretation': 'Weighted penalty for level-wide pairs: moderate (0.75-0.85) = 0.5x, high (0.85-0.90) = 1.0x, very high (>0.90) = 2.0x. More sensitive to near-duplicates. Low values (<0.20) indicate good level-wide diversity. Higher values suggest redundancy across the entire hierarchy level.',
+                'status': 'good' if metrics['global_duplicate_penalty'] <= 0.20 else 'fair' if metrics['global_duplicate_penalty'] <= 0.35 else 'poor'
             },
             'intra_level_diversity': {
                 'value': metrics['intra_level_diversity'],
@@ -199,42 +217,31 @@ class HierarchyMetricsEvaluator:
             },
             'inter_level_granularity': {
                 'value': metrics['inter_level_granularity'],
-                'expected_range': '0.1-0.3 (ideal)',
-                'interpretation': 'Difference between parent-child and sibling similarities. Positive values (0.1-0.3) indicate that deeper levels add meaningful refinement. Negative values suggest siblings are more similar than parent-child, indicating weak hierarchical structure.',
-                'status': 'good' if 0.1 <= metrics['inter_level_granularity'] <= 0.3 else 'fair' if 0.0 <= metrics['inter_level_granularity'] <= 0.4 else 'poor'
-            },
-            'net_purity': {
-                'value': metrics['net_purity'],
-                'expected_range': '0.6-0.9 (good)',
-                'interpretation': 'Content alignment: Semantic cohesion between parent topic labels and child document content. Higher values (0.6-0.9) indicate child documents align well with parent topic semantics. Measures how well actual content fits the parent topic description.',
-                'status': 'good' if 0.6 <= metrics['net_purity'] <= 0.9 else 'fair' if 0.4 <= metrics['net_purity'] <= 0.95 else 'poor'
-            },
-            'net_purity_label': {
-                'value': metrics.get('net_purity_label', metrics.get('parent_child_similarity', 0)),
-                'expected_range': '0.5-0.8 (typical)',
-                'interpretation': 'Structural alignment: Semantic similarity between parent and child topic labels. Same as Parent-Child Similarity, measuring label-to-label relationships in the hierarchy structure.',
-                'status': 'good' if 0.5 <= metrics.get('net_purity_label', 0) <= 0.8 else 'fair' if 0.3 <= metrics.get('net_purity_label', 0) <= 0.9 else 'poor'
+                'expected_range': '>0.1 (good), >0.2 (excellent), depth-weighted',
+                'interpretation': 'Normalized difference between parent-child and sibling similarities, weighted by depth. Deeper levels are weighted more heavily. Positive values (>0.1) indicate that deeper levels add meaningful refinement. Values >0.2 show excellent hierarchical structure. Negative values suggest siblings are more similar than parent-child, indicating weak hierarchical structure.',
+                'status': 'excellent' if metrics['inter_level_granularity'] >= 0.2 else 'good' if metrics['inter_level_granularity'] >= 0.1 else 'fair' if metrics['inter_level_granularity'] >= 0.0 else 'poor'
             },
             'composite_quality_score': {
                 'value': metrics['composite_quality_score'],
                 'expected_range': '0.7-1.0 (excellent), 0.5-0.7 (good), <0.5 (needs improvement)',
-                'interpretation': 'Overall hierarchical quality combining coherence, diversity, and structural relationships. Weighted combination: 30% coherence + 30% (1-duplication) + 20% diversity + 20% parent-child similarity.',
+                'interpretation': 'Overall structural hierarchical quality with enhanced sensitivity to granularity and duplication. Weighted combination: 25% parent-child similarity + 35% (1-duplication) + 20% diversity + 20% granularity. Emphasizes low duplication and good hierarchical granularity.',
                 'status': 'excellent' if metrics['composite_quality_score'] >= 0.7 else 'good' if metrics['composite_quality_score'] >= 0.5 else 'needs_improvement'
             }
         }
         return summary
     
-    def compute_metrics(self, root: HierarchyNode, xml_path: str) -> Optional[Dict]:
+    def compute_metrics(self, root: HierarchyNode, xml_path: str = None) -> Optional[Dict]:
         """
-        Compute all semantic metrics for a hierarchy.
+        Compute structural hierarchy metrics (topic labels only, no document content).
+        
+        Args:
+            root: Root node of the hierarchy tree
+            xml_path: Optional XML path (not used for structural metrics, kept for compatibility)
         
         Returns:
             Dictionary with metrics or None if computation fails
         """
         try:
-            # Extract documents per code
-            code_to_documents = self._extract_documents(xml_path)
-            
             # Get all nodes
             all_nodes = self._get_all_nodes(root)
             if not all_nodes:
@@ -249,14 +256,10 @@ class HierarchyMetricsEvaluator:
             nodes_by_level = self._get_nodes_by_level(root)
             max_depth = max(nodes_by_level.keys()) if nodes_by_level else 1
             
-            # 1. Embedding Coherence (within subtopics)
-            self._load_model()  # Pre-load model
-            
-            coherence_scores = []
+            # Load model and embed code descriptions (batch for efficiency)
+            self._load_model()
             code_embeddings = {}
-            document_centroids = {}
             
-            # Embed code descriptions (batch for efficiency)
             code_descriptions = [(node.key, node.description or "") for node in nodes if node.description]
             codes_with_embeddings_count = 0
             if code_descriptions:
@@ -273,41 +276,7 @@ class HierarchyMetricsEvaluator:
                 del all_code_embs
                 del code_descriptions, descriptions_list
             
-            # Embed documents and compute coherence
-            codes_with_docs = [(key, docs) for key, docs in code_to_documents.items() if docs]
-            codes_with_docs_count = len(codes_with_docs)
-            codes_with_both_count = len([key for key, _ in codes_with_docs if key in code_embeddings])
-            single_doc_count = 0
-            multi_doc_count = 0
-            
-            for idx, (code_key, documents) in enumerate(codes_with_docs):
-                if documents:
-                    # Embed documents
-                    doc_embeddings = self._embed_texts(documents)
-                    if len(doc_embeddings) > 0:
-                        # Compute centroid (already float32 from _embed_texts)
-                        centroid = np.mean(doc_embeddings, axis=0)
-                        document_centroids[code_key] = centroid
-                        
-                        # Only compute coherence for codes with 2+ documents (single-doc always = 1.0)
-                        if len(doc_embeddings) >= 2:
-                            # Compute coherence: mean cosine similarity between documents and centroid
-                            similarities = cosine_similarity(doc_embeddings, centroid.reshape(1, -1))
-                            coherence = float(np.mean(similarities))
-                            coherence_scores.append(coherence)
-                            multi_doc_count += 1
-                            # Clear similarity matrix immediately
-                            del similarities
-                        else:
-                            single_doc_count += 1
-                    
-                    # CRITICAL: Delete document embeddings immediately after computing centroid
-                    # This frees 50-70% of memory used for document processing
-                    del doc_embeddings
-            
-            embedding_coherence = float(np.mean(coherence_scores)) if coherence_scores else 0.0
-            
-            # 2. Parent-Child Similarity (mean cosine) - using code descriptions
+            # 1. Parent-Child Similarity (mean cosine) - using code descriptions
             parent_child_similarities = []
             total_parent_child_pairs = 0
             for node in nodes:
@@ -356,8 +325,9 @@ class HierarchyMetricsEvaluator:
                 
                 return upper_triangle
             
-            # 3. Local Duplication Penalty (fraction of sibling pairs with cosine > 0.85)
-            local_duplicate_count = 0
+            # 2. Local Duplication Penalty (weighted by similarity magnitude, more sensitive)
+            # Uses graduated penalties: moderate (0.75-0.85) = 0.5x, high (0.85-0.90) = 1.0x, very high (>0.90) = 2.0x
+            local_duplicate_penalty_weighted = 0.0
             local_total_pairs = 0
             local_total_sibling_groups = 0
             local_groups_with_embeddings = 0
@@ -382,13 +352,26 @@ class HierarchyMetricsEvaluator:
                     if upper_triangle is not None:
                         local_groups_with_embeddings += 1
                         local_total_pairs += len(upper_triangle)
-                        local_duplicate_count += sum(1 for s in upper_triangle if s > 0.85)
+                        
+                        # Weighted penalty based on similarity magnitude
+                        for sim in upper_triangle:
+                            sim_float = float(sim)
+                            if sim_float >= self.DUPLICATE_THRESHOLD_VERY_HIGH:
+                                # Very high similarity: 2.0x penalty
+                                local_duplicate_penalty_weighted += 2.0
+                            elif sim_float >= self.DUPLICATE_THRESHOLD_HIGH:
+                                # High similarity: 1.0x penalty (original threshold)
+                                local_duplicate_penalty_weighted += 1.0
+                            elif sim_float >= self.DUPLICATE_THRESHOLD_MODERATE:
+                                # Moderate similarity: 0.5x penalty (catch near-duplicates)
+                                local_duplicate_penalty_weighted += 0.5
             
-            local_duplicate_penalty = local_duplicate_count / local_total_pairs if local_total_pairs > 0 else 0.0
+            # Normalize by total pairs (weighted average)
+            local_duplicate_penalty = local_duplicate_penalty_weighted / local_total_pairs if local_total_pairs > 0 else 0.0
             local_duplication_coverage = local_groups_with_embeddings / local_total_sibling_groups if local_total_sibling_groups > 0 else 0.0
             
-            # 4. Global Duplication Penalty (fraction of level-wise topic pairs with cosine > 0.85)
-            global_duplicate_count = 0
+            # 3. Global Duplication Penalty (weighted by similarity magnitude, more sensitive)
+            global_duplicate_penalty_weighted = 0.0
             global_total_pairs = 0
             global_total_level_nodes = 0
             global_levels_with_embeddings = 0
@@ -411,20 +394,34 @@ class HierarchyMetricsEvaluator:
                     similarities = cosine_similarity(emb_matrix)
                     upper_triangle = similarities[np.triu_indices(len(similarities), k=1)]
                     global_total_pairs += len(upper_triangle)
-                    global_duplicate_count += sum(1 for s in upper_triangle if s > 0.85)
+                    
+                    # Weighted penalty based on similarity magnitude
+                    for sim in upper_triangle:
+                        sim_float = float(sim)
+                        if sim_float >= self.DUPLICATE_THRESHOLD_VERY_HIGH:
+                            # Very high similarity: 2.0x penalty
+                            global_duplicate_penalty_weighted += 2.0
+                        elif sim_float >= self.DUPLICATE_THRESHOLD_HIGH:
+                            # High similarity: 1.0x penalty
+                            global_duplicate_penalty_weighted += 1.0
+                        elif sim_float >= self.DUPLICATE_THRESHOLD_MODERATE:
+                            # Moderate similarity: 0.5x penalty
+                            global_duplicate_penalty_weighted += 0.5
+                    
                     # Clear intermediate arrays to free memory immediately
                     del emb_matrix, similarities
                     del level_embeddings  # Clear the list
                     upper_triangle = None
             
-            global_duplicate_penalty = global_duplicate_count / global_total_pairs if global_total_pairs > 0 else 0.0
+            # Normalize by total pairs (weighted average)
+            global_duplicate_penalty = global_duplicate_penalty_weighted / global_total_pairs if global_total_pairs > 0 else 0.0
             global_duplication_coverage = sum(1 for level, level_nodes in nodes_by_level.items() 
                                              if level > 0 and len(level_nodes) >= 2 and 
                                              any(node.key in code_embeddings for node in level_nodes)) / \
                                          max(1, sum(1 for level, level_nodes in nodes_by_level.items() 
                                                    if level > 0 and len(level_nodes) >= 2))
             
-            # 5. Intra-Level Diversity (1 - mean cosine) - REUSE cached sibling similarities
+            # 4. Intra-Level Diversity (1 - mean cosine) - REUSE cached sibling similarities
             level_diversities = []
             diversity_total_groups = 0
             diversity_groups_with_embeddings = 0
@@ -456,127 +453,175 @@ class HierarchyMetricsEvaluator:
             intra_level_diversity = float(np.mean(level_diversities)) if level_diversities else 0.0
             diversity_coverage = diversity_groups_with_embeddings / diversity_total_groups if diversity_total_groups > 0 else 0.0
             
-            # 6. Inter-Level Differentiation (Granularity Δ) - REUSE cached sibling similarities
-            # Mean sibling similarity (reuse from cache)
-            sibling_similarities = []
-            for cache_key, upper_triangle in sibling_similarity_cache.items():
-                sibling_similarities.extend([float(s) for s in upper_triangle])
+            # 5. Inter-Level Differentiation (Granularity) - Enhanced with ratio and depth weighting
+            # Compute granularity per sibling group with depth weighting for more sensitive detection
+            granularity_scores = []
+            granularity_scores_unweighted = []
+            depth_weights = []
             
-            mean_sibling_similarity = float(np.mean(sibling_similarities)) if sibling_similarities else 0.0
-            inter_level_granularity = parent_child_similarity - mean_sibling_similarity
+            # Collect all sibling similarities first (for fallback)
+            all_sibling_similarities = []
+            for cache_key, upper_triangle in sibling_similarity_cache.items():
+                all_sibling_similarities.extend([float(s) for s in upper_triangle])
+            
+            mean_sibling_similarity_overall = float(np.mean(all_sibling_similarities)) if all_sibling_similarities else 0.0
+            
+            # Compute granularity for each sibling group (more granular)
+            for cache_key, upper_triangle in sibling_similarity_cache.items():
+                parent_key, sibling_keys_tuple = cache_key
+                
+                # Get mean sibling similarity for this group
+                sibling_sims = [float(s) for s in upper_triangle]
+                if len(sibling_sims) == 0:
+                    continue
+                
+                mean_sibling = float(np.mean(sibling_sims))
+                
+                # Get parent-child similarities for children in this group
+                parent_child_sims = []
+                group_depth = None
+                
+                for node in nodes:
+                    if node.key in sibling_keys_tuple and node.parent and node.parent.key == parent_key:
+                        if group_depth is None:
+                            group_depth = node.depth
+                        
+                        if node.key in code_embeddings and parent_key in code_embeddings:
+                            parent_emb = code_embeddings[parent_key].reshape(1, -1)
+                            child_emb = code_embeddings[node.key].reshape(1, -1)
+                            pc_sim = float(cosine_similarity(parent_emb, child_emb)[0][0])
+                            parent_child_sims.append(pc_sim)
+                
+                if len(parent_child_sims) > 0:
+                    mean_pc = float(np.mean(parent_child_sims))
+                    
+                    # Enhanced granularity calculation: normalized difference with sensitivity boost
+                    # Difference: parent-child similarity - sibling similarity
+                    granularity_diff = mean_pc - mean_sibling
+                    granularity_scores_unweighted.append(granularity_diff)
+                    
+                    # Normalized difference: scale by sibling similarity to make it relative
+                    # This makes small differences more meaningful when siblings are similar
+                    # Example: if siblings are 0.8 similar, a 0.05 difference is significant
+                    # But if siblings are 0.3 similar, a 0.05 difference is less significant
+                    if mean_sibling > 0.1:  # Only normalize if siblings are reasonably similar
+                        # Normalized difference: (pc - sibling) / (1 - sibling)
+                        # This scales the difference by the "room for improvement"
+                        normalization_factor = 1.0 - mean_sibling
+                        if normalization_factor > 0.01:
+                            granularity_normalized = granularity_diff / normalization_factor
+                        else:
+                            granularity_normalized = granularity_diff
+                    else:
+                        # If siblings are already very different, use simple difference
+                        granularity_normalized = granularity_diff
+                    
+                    # Use normalized difference for better sensitivity
+                    granularity_value = granularity_normalized
+                    
+                    # Depth weighting: deeper levels should show more refinement (granularity)
+                    if self.GRANULARITY_DEPTH_WEIGHT and group_depth is not None:
+                        # Weight by depth: deeper = more important (log scale to avoid too much weight)
+                        # Depth 1: weight=1.0, Depth 2: weight~1.2, Depth 3: weight~1.4, etc.
+                        depth_weight = 1.0 + np.log1p(max(0, group_depth - 1)) * 0.2
+                    else:
+                        depth_weight = 1.0
+                    
+                    granularity_scores.append(granularity_value * depth_weight)
+                    depth_weights.append(depth_weight)
+            
+            # Compute overall granularity (weighted average if depth weighting is enabled)
+            if len(granularity_scores) > 0:
+                if self.GRANULARITY_DEPTH_WEIGHT and len(depth_weights) > 0:
+                    # Weighted average by depth (emphasizes deeper levels)
+                    total_weight = sum(depth_weights)
+                    inter_level_granularity = sum(g * w for g, w in zip(granularity_scores, depth_weights)) / total_weight
+                else:
+                    # Simple average
+                    inter_level_granularity = float(np.mean(granularity_scores))
+            else:
+                # Fallback to original calculation (simple difference)
+                inter_level_granularity = parent_child_similarity - mean_sibling_similarity_overall
+            
+            # Compute unweighted version for comparison
+            inter_level_granularity_unweighted = float(np.mean(granularity_scores_unweighted)) if granularity_scores_unweighted else (parent_child_similarity - mean_sibling_similarity_overall)
             
             # Clear sibling similarity cache after use (no longer needed)
             del sibling_similarity_cache
             sibling_similarities = None
             
-            # 7. Net Purity - Two versions:
-            #    a) Label-to-Content: Parent label vs child documents (content alignment)
-            #    b) Label-to-Label: Parent label vs child label (structural alignment)
-            net_purity_content_scores = []  # Parent label vs child documents
-            net_purity_label_scores = []    # Parent label vs child label
-            total_parent_child_pairs_for_purity = 0
-            
-            for node in nodes:
-                if node.parent and node.parent.key != 'root':
-                    parent_key = node.parent.key
-                    child_key = node.key
-                    total_parent_child_pairs_for_purity += 1
-                    
-                    # Get parent code embedding
-                    if parent_key in code_embeddings:
-                        parent_emb = code_embeddings[parent_key]
-                        
-                        # Version A: Parent label vs child documents (content-based)
-                        if child_key in document_centroids:
-                            child_centroid = document_centroids[child_key]
-                            sim = cosine_similarity(
-                                parent_emb.reshape(1, -1),
-                                child_centroid.reshape(1, -1)
-                            )[0][0]
-                            net_purity_content_scores.append(float(sim))
-                        
-                        # Version B: Parent label vs child label (structural)
-                        if child_key in code_embeddings:
-                            child_emb = code_embeddings[child_key]
-                            sim = cosine_similarity(
-                                parent_emb.reshape(1, -1),
-                                child_emb.reshape(1, -1)
-                            )[0][0]
-                            net_purity_label_scores.append(float(sim))
-            
-            # Use content-based version as primary (original metric)
-            # Label-to-label is same as parent-child similarity, so we'll use content version
-            net_purity = float(np.mean(net_purity_content_scores)) if net_purity_content_scores else 0.0
-            net_purity_label = float(np.mean(net_purity_label_scores)) if net_purity_label_scores else 0.0
-            net_purity_coverage = len(net_purity_content_scores) / total_parent_child_pairs_for_purity if total_parent_child_pairs_for_purity > 0 else 0.0
-            
             # MEMORY OPTIMIZATION: Clear large data structures after last use
-            # code_embeddings and document_centroids are no longer needed after net purity
-            # code_to_documents is also no longer needed (only used for centroids)
+            # code_embeddings is no longer needed after all metrics are computed
             # These can be hundreds of MB for large hierarchies
             del code_embeddings
-            del document_centroids
-            del code_to_documents
             
             # Clear other large intermediate structures
-            del codes_with_docs
             del nodes_by_level
             
             # Force garbage collection to free memory immediately
             import gc
             gc.collect()
             
-            # 8. Composite Hierarchical Quality Score
-            # Q_hier = α*C_embed + β*(1-D_dup) + γ*D_intra + δ*S_pc
-            # Where: C_embed = coherence, D_dup = duplicate penalty (use global), D_intra = diversity, S_pc = parent-child similarity
-            # Weights: α=0.3, β=0.3, γ=0.2, δ=0.2 (normalized to sum to 1.0)
-            alpha, beta, gamma, delta = 0.3, 0.3, 0.2, 0.2
+            # 6. Composite Structural Quality Score (hierarchy-only, enhanced for granularity and duplication)
+            # Q_structural = α*S_pc + β*(1-D_dup) + γ*D_intra + δ*G_granularity
+            # Where: S_pc = parent-child similarity, D_dup = duplicate penalty (use global), 
+            #        D_intra = diversity, G_granularity = granularity score
+            # Weights: α=0.25 (parent-child), β=0.35 (anti-duplication), γ=0.20 (diversity), δ=0.20 (granularity)
+            # Increased weight on anti-duplication and granularity for better sensitivity
+            alpha, beta, gamma, delta = 0.25, 0.35, 0.20, 0.20
             
-            # Ensure all components are in [0, 1] range before combining
-            coherence_norm = max(0.0, min(1.0, embedding_coherence))
+            # Normalize all components to [0, 1] range before combining
             duplication_norm = max(0.0, min(1.0, global_duplicate_penalty))
             diversity_norm = max(0.0, min(1.0, intra_level_diversity))
             parent_child_norm = max(0.0, min(1.0, parent_child_similarity))
             
+            # Normalize granularity: positive values are good, negative are bad
+            # Normalized difference can range from about -1 to +1 (or beyond)
+            # Good granularity: > 0.1, Excellent: > 0.2, Poor: < 0, Very poor: < -0.2
+            # Map to [0, 1] range: 0.2+ -> 1.0, 0.0 -> 0.5, -0.2 -> 0.0
+            if inter_level_granularity >= 0:
+                # Positive granularity (good): map to [0.5, 1.0]
+                # 0.0 -> 0.5, 0.1 -> 0.75, 0.2+ -> 1.0
+                granularity_norm = 0.5 + min(0.5, inter_level_granularity * 2.5)
+            else:
+                # Negative granularity (bad): map to [0.0, 0.5]
+                # 0.0 -> 0.5, -0.1 -> 0.25, -0.2 -> 0.0
+                granularity_norm = max(0.0, 0.5 + inter_level_granularity * 2.5)
+            
+            # Ensure granularity_norm is in [0, 1] range (clip extreme values)
+            granularity_norm = max(0.0, min(1.0, granularity_norm))
+            
+            # Composite score with emphasis on low duplication and good granularity
             composite_score = (
-                alpha * coherence_norm +
-                beta * (1.0 - duplication_norm) +
+                alpha * parent_child_norm +
+                beta * (1.0 - duplication_norm) +  # Higher weight on anti-duplication
                 gamma * diversity_norm +
-                delta * parent_child_norm
+                delta * granularity_norm  # Added granularity component
             )
             # Normalize to 0-1 range (already should be, but ensure)
             composite_score = max(0.0, min(1.0, composite_score))
             
             
-            # 9. Generate comprehensive metrics summary
+            # 7. Generate comprehensive metrics summary
             metrics_summary = self._generate_metrics_summary({
-                'embedding_coherence': embedding_coherence,
                 'parent_child_similarity': parent_child_similarity,
                 'local_duplicate_penalty': local_duplicate_penalty,
                 'global_duplicate_penalty': global_duplicate_penalty,
                 'intra_level_diversity': intra_level_diversity,
                 'inter_level_granularity': inter_level_granularity,
-                'net_purity': net_purity,
-                'net_purity_label': net_purity_label,
                 'composite_quality_score': composite_score
             })
             
             
-            # Calculate overall coverage statistics (using cached counts)
+            # Calculate overall coverage statistics
             total_codes_count = len(nodes)
             coverage_stats = {
                 'total_codes': total_codes_count,
                 'codes_with_descriptions': codes_with_embeddings_count,
-                'codes_with_documents': codes_with_docs_count,
-                'codes_with_both': codes_with_both_count,
                 'description_coverage': codes_with_embeddings_count / total_codes_count if total_codes_count > 0 else 0.0,
-                'document_coverage': codes_with_docs_count / total_codes_count if total_codes_count > 0 else 0.0,
-                'coherence_coverage': multi_doc_count / codes_with_docs_count if codes_with_docs_count > 0 else 0.0,
-                'single_document_codes': single_doc_count,
                 'parent_child_coverage': parent_child_coverage,
                 'local_duplication_coverage': local_duplication_coverage,
-                'diversity_coverage': diversity_coverage,
-                'net_purity_coverage': net_purity_coverage
+                'diversity_coverage': diversity_coverage
             }
             
             # Clear nodes list and other structures after computing stats (no longer needed)
@@ -584,20 +629,16 @@ class HierarchyMetricsEvaluator:
             del all_nodes
             
             return {
-                'embedding_coherence': round(embedding_coherence, 4),
                 'parent_child_similarity': round(parent_child_similarity, 4),
                 'local_duplicate_penalty': round(local_duplicate_penalty, 4),
                 'global_duplicate_penalty': round(global_duplicate_penalty, 4),
                 'intra_level_diversity': round(intra_level_diversity, 4),
                 'inter_level_granularity': round(inter_level_granularity, 4),
-                'net_purity': round(net_purity, 4),
-                'net_purity_label': round(net_purity_label, 4),  # Label-to-label version
                 'composite_quality_score': round(composite_score, 4),
                 'metrics_summary': metrics_summary,
                 'coverage_stats': coverage_stats,
                 'max_depth': max_depth,
-                'total_codes': total_codes_count,
-                'codes_with_documents': codes_with_docs_count
+                'total_codes': total_codes_count
             }
             
         except Exception as e:
@@ -850,18 +891,15 @@ class HierarchyEvaluator:
         )
         
         
-        # Compute comparison deltas
+        # Compute comparison deltas (structural metrics only)
         comparison = {}
         if benchmark_metrics and model_metrics:
             comparison = {
-                'delta_coherence': model_metrics.get('embedding_coherence', 0) - benchmark_metrics.get('embedding_coherence', 0),
                 'delta_parent_child': model_metrics.get('parent_child_similarity', 0) - benchmark_metrics.get('parent_child_similarity', 0),
                 'delta_local_duplicate_penalty': benchmark_metrics.get('local_duplicate_penalty', 0) - model_metrics.get('local_duplicate_penalty', 0),
                 'delta_global_duplicate_penalty': benchmark_metrics.get('global_duplicate_penalty', 0) - model_metrics.get('global_duplicate_penalty', 0),
                 'delta_diversity': model_metrics.get('intra_level_diversity', 0) - benchmark_metrics.get('intra_level_diversity', 0),
                 'delta_granularity': model_metrics.get('inter_level_granularity', 0) - benchmark_metrics.get('inter_level_granularity', 0),
-                'delta_net_purity': model_metrics.get('net_purity', 0) - benchmark_metrics.get('net_purity', 0),
-                'delta_net_purity_label': model_metrics.get('net_purity_label', 0) - benchmark_metrics.get('net_purity_label', 0),
                 'delta_composite_quality': model_metrics.get('composite_quality_score', 0) - benchmark_metrics.get('composite_quality_score', 0),
             }
         

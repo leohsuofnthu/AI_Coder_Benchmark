@@ -1160,22 +1160,12 @@
 
                     <div class="section-group mb-5">
                         <h3 class="section-title mb-4">
-                            <i class="fas fa-chart-bar me-2"></i>Semantic Metrics
+                            <i class="fas fa-chart-bar me-2"></i>Structural Metrics
                         </h3>
                         
-                        <!-- Row 1: Core Similarity & Coherence Metrics -->
+                        <!-- Row 1: Core Structural Metrics -->
                         <div class="row g-4 mb-4">
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-magnet fa-2x" style="color: var(--primary-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Embedding Coherence</div>
-                                    <div class="metric-value" id="singleEmbeddingCoherence">-</div>
-                                    <small class="text-muted">Within subtopics (≥0.75 good)</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-sitemap fa-2x" style="color: var(--success-light);"></i>
@@ -1185,17 +1175,7 @@
                                     <small class="text-muted">Mean cosine similarity</small>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="metric-card text-center">
-                                    <div class="metric-icon-wrapper">
-                                        <i class="fas fa-filter fa-2x" style="color: var(--success-light);"></i>
-                                    </div>
-                                    <div class="metric-label">Net Purity (Content)</div>
-                                    <div class="metric-value" id="singleNetPurity">-</div>
-                                    <small class="text-muted">Parent label vs child documents</small>
-                                </div>
-                            </div>
-                            <div class="col-lg-3 col-md-6">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center metric-primary">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-star fa-2x" style="color: var(--warning-color);"></i>
@@ -1205,11 +1185,7 @@
                                     <small class="text-muted">Overall hierarchy quality (0-1)</small>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <!-- Row 2: Diversity & Duplication Metrics -->
-                        <div class="row g-4">
-                            <div class="col-lg-3 col-md-6">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-layer-group fa-2x" style="color: var(--accent-purple-light);"></i>
@@ -1219,7 +1195,11 @@
                                     <small class="text-muted">1 - mean cosine (higher=better)</small>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
+                        </div>
+                        
+                        <!-- Row 2: Diversity & Duplication Metrics -->
+                        <div class="row g-4">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-chart-area fa-2x" style="color: var(--accent-indigo);"></i>
@@ -1229,7 +1209,7 @@
                                     <small class="text-muted">Parent-child - Sibling Δ</small>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--warning-light);"></i>
@@ -1239,7 +1219,7 @@
                                     <small class="text-muted">Sibling pairs >0.85 (≤0.10 good)</small>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
+                            <div class="col-lg-4 col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-icon-wrapper">
                                         <i class="fas fa-exclamation-circle fa-2x" style="color: var(--danger-light);"></i>
@@ -1265,22 +1245,16 @@
                             </div>
                         </div>
                         <div class="row g-4 mt-3">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-label">Total Codes</div>
                                     <div class="metric-value" id="singleTotalCodes">-</div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <div class="metric-card text-center">
                                     <div class="metric-label">Max Depth</div>
                                     <div class="metric-value" id="singleMaxDepth">-</div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="metric-card text-center">
-                                    <div class="metric-label">Codes with Documents</div>
-                                    <div class="metric-value" id="singleCodesWithDocuments">-</div>
                                 </div>
                             </div>
                         </div>
@@ -1300,21 +1274,7 @@
                                             <div class="metric-card">
                                                 <div class="metric-label">Codes with Descriptions</div>
                                                 <div class="metric-value" id="coverageDescriptions" style="font-size: 1.5rem;">-</div>
-                                                <small class="text-muted">Required for label-based metrics</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="metric-card">
-                                                <div class="metric-label">Codes with Documents</div>
-                                                <div class="metric-value" id="coverageDocuments" style="font-size: 1.5rem;">-</div>
-                                                <small class="text-muted">Required for content-based metrics</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="metric-card">
-                                                <div class="metric-label">Coherence Coverage</div>
-                                                <div class="metric-value" id="coverageCoherence" style="font-size: 1.5rem;">-</div>
-                                                <small class="text-muted">Codes with 2+ documents (single-doc excluded)</small>
+                                                <small class="text-muted">Required for structural metrics</small>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
@@ -1326,16 +1286,16 @@
                                         </div>
                                         <div class="col-md-6">
                                             <div class="metric-card">
-                                                <div class="metric-label">Net Purity Coverage</div>
-                                                <div class="metric-value" id="coverageNetPurity" style="font-size: 1.5rem;">-</div>
-                                                <small class="text-muted">Pairs with parent label + child documents</small>
+                                                <div class="metric-label">Local Duplication Coverage</div>
+                                                <div class="metric-value" id="coverageLocalDuplication" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Sibling groups with descriptions</small>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="metric-card">
-                                                <div class="metric-label">Single-Document Codes</div>
-                                                <div class="metric-value" id="coverageSingleDoc" style="font-size: 1.5rem;">-</div>
-                                                <small class="text-muted">Excluded from coherence (always = 1.0)</small>
+                                                <div class="metric-label">Diversity Coverage</div>
+                                                <div class="metric-value" id="coverageDiversity" style="font-size: 1.5rem;">-</div>
+                                                <small class="text-muted">Sibling groups with descriptions</small>
                                             </div>
                                         </div>
                                     </div>
@@ -2437,13 +2397,11 @@
             
             // Display metrics (with error handling for missing values)
             try {
-                document.getElementById('singleEmbeddingCoherence').textContent = formatMetric(metrics.embedding_coherence);
                 document.getElementById('singleParentChildSimilarity').textContent = formatMetric(metrics.parent_child_similarity);
                 document.getElementById('singleLocalDuplicatePenalty').textContent = formatMetric(metrics.local_duplicate_penalty);
                 document.getElementById('singleGlobalDuplicatePenalty').textContent = formatMetric(metrics.global_duplicate_penalty);
                 document.getElementById('singleIntraLevelDiversity').textContent = formatMetric(metrics.intra_level_diversity);
                 document.getElementById('singleInterLevelGranularity').textContent = formatMetric(metrics.inter_level_granularity);
-                document.getElementById('singleNetPurity').textContent = formatMetric(metrics.net_purity);
                 document.getElementById('singleCompositeQualityScore').textContent = formatMetric(metrics.composite_quality_score);
             } catch (metricError) {
                 console.error('Error displaying metrics:', metricError);
@@ -2454,7 +2412,6 @@
             try {
                 document.getElementById('singleTotalCodes').textContent = metrics.total_codes || '-';
                 document.getElementById('singleMaxDepth').textContent = metrics.max_depth || '-';
-                document.getElementById('singleCodesWithDocuments').textContent = metrics.codes_with_documents || '-';
             } catch (statError) {
                 console.error('Error displaying statistics:', statError);
             }
@@ -2467,24 +2424,18 @@
                     
                     if (coverageSection) {
                         const descEl = document.getElementById('coverageDescriptions');
-                        const docsEl = document.getElementById('coverageDocuments');
-                        const cohEl = document.getElementById('coverageCoherence');
                         const pcEl = document.getElementById('coverageParentChild');
-                        const npEl = document.getElementById('coverageNetPurity');
-                        const sdEl = document.getElementById('coverageSingleDoc');
+                        const localDupEl = document.getElementById('coverageLocalDuplication');
+                        const divEl = document.getElementById('coverageDiversity');
                         
                         if (descEl) descEl.textContent = 
                             `${cov.codes_with_descriptions || 0} / ${cov.total_codes || 0} (${formatMetric((cov.description_coverage || 0) * 100)}%)`;
-                        if (docsEl) docsEl.textContent = 
-                            `${cov.codes_with_documents || 0} / ${cov.total_codes || 0} (${formatMetric((cov.document_coverage || 0) * 100)}%)`;
-                        if (cohEl) cohEl.textContent = 
-                            `${formatMetric((cov.coherence_coverage || 0) * 100)}%`;
                         if (pcEl) pcEl.textContent = 
                             `${formatMetric((cov.parent_child_coverage || 0) * 100)}%`;
-                        if (npEl) npEl.textContent = 
-                            `${formatMetric((cov.net_purity_coverage || 0) * 100)}%`;
-                        if (sdEl) sdEl.textContent = 
-                            `${cov.single_document_codes || 0} codes`;
+                        if (localDupEl) localDupEl.textContent = 
+                            `${formatMetric((cov.local_duplication_coverage || 0) * 100)}%`;
+                        if (divEl) divEl.textContent = 
+                            `${formatMetric((cov.diversity_coverage || 0) * 100)}%`;
                         
                         // Show coverage section
                         coverageSection.style.display = 'block';
@@ -2670,24 +2621,17 @@
         function displayStats(containerId, stats) {
             const container = document.getElementById(containerId);
             const formatValue = (val) => val !== undefined && val !== null ? val.toFixed(3) : 'N/A';
-            const getCoherenceColor = (val) => val >= 0.75 ? 'text-success' : val >= 0.5 ? 'text-warning' : 'text-danger';
             const getPenaltyColor = (val) => val <= 0.10 ? 'text-success' : val <= 0.3 ? 'text-warning' : 'text-danger';
             
             container.innerHTML = `
                 <div class="mb-3">
                     <h5 class="mb-3">Structural Stats</h5>
-                    <div class="mb-2"><strong>Total Codes:</strong> ${stats.total_nodes || 0}</div>
+                    <div class="mb-2"><strong>Total Codes:</strong> ${stats.total_codes || stats.total_nodes || 0}</div>
                     <div class="mb-2"><strong>Max Depth:</strong> ${stats.max_depth || 0}</div>
-                    <div class="mb-2"><strong>Codes with Documents:</strong> ${stats.codes_with_documents || 0}</div>
                 </div>
-                ${stats.coherence !== undefined ? `
+                ${stats.parent_child_similarity !== undefined || stats.local_duplicate_penalty !== undefined ? `
                     <div class="mt-3 pt-3 border-top" style="border-color: var(--card-border);">
-                        <h5 class="mb-3">Semantic Metrics</h5>
-                        <div class="mb-2">
-                            <strong>Embedding Coherence:</strong> 
-                            <span class="${getCoherenceColor(stats.coherence)}">${formatValue(stats.coherence)}</span>
-                            <small class="text-muted ms-2">(≥0.75 good)</small>
-                        </div>
+                        <h5 class="mb-3">Structural Metrics</h5>
                         ${stats.parent_child_similarity !== undefined ? `
                             <div class="mb-2">
                                 <strong>Parent–Child Similarity:</strong> 
@@ -2718,12 +2662,6 @@
                             <div class="mb-2">
                                 <strong>Inter-Level Granularity:</strong> 
                                 <span>${formatValue(stats.inter_level_granularity)}</span>
-                            </div>
-                        ` : ''}
-                        ${stats.net_purity !== undefined ? `
-                            <div class="mb-2">
-                                <strong>Net Purity:</strong> 
-                                <span>${formatValue(stats.net_purity)}</span>
                             </div>
                         ` : ''}
                         ${stats.composite_quality_score !== undefined ? `
