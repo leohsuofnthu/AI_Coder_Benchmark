@@ -37,8 +37,25 @@ AI_Coder_Metrics/
 
 ### Web Application (Recommended)
 
+#### Install CPU-Only Version (Recommended for CPU-only systems)
+
 ```bash
-# Install dependencies
+# Step 1: Install CPU-only PyTorch (no CUDA dependencies, smaller size)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Step 2: Install other dependencies
+pip install -r requirements.txt
+
+# Step 3: Run locally
+python app.py
+
+# Open browser to: http://localhost:5000
+```
+
+#### Alternative: Install with GPU Support (if you have CUDA)
+
+```bash
+# Install dependencies (includes GPU support)
 pip install -r requirements.txt
 
 # Run locally
@@ -46,6 +63,12 @@ python app.py
 
 # Open browser to: http://localhost:5000
 ```
+
+**Note**: The CPU-only version is recommended because:
+- ✅ **Smaller installation** (~150MB vs ~2GB for GPU version)
+- ✅ **No CUDA dependencies** (works on any system)
+- ✅ **Faster installation** (no GPU drivers needed)
+- ✅ **Sufficient performance** (sentence-transformers is optimized for CPU)
 
 ### Usage
 1. **Upload** your model's XML output (drag & drop or click)
@@ -207,10 +230,28 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Render deployment instructions.
 - **Python**: 3.7+
 - **Framework**: Flask 2.3+
 - **Server**: Gunicorn (production)
-- **Dependencies**: Minimal (Flask only, no ML libraries)
+- **ML Backend**: sentence-transformers (CPU-optimized, all-MiniLM-L6-v2 model)
+- **Dependencies**: Flask, sentence-transformers, PyTorch (CPU-only), scikit-learn, numpy
 - **Storage**: File-based (no database needed)
 - **Session**: Flask sessions for CSV download
 - **Upload Limit**: 50MB per file
+
+### Dependencies Installation
+
+**CPU-Only Installation (Recommended):**
+```bash
+# Install CPU-only PyTorch first
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Then install other dependencies
+pip install -r requirements.txt
+```
+
+**Benefits of CPU-Only Version:**
+- Smaller package size (~150MB vs ~2GB)
+- No CUDA/GPU drivers required
+- Works on any system (Windows, Mac, Linux)
+- Fast enough for hierarchy metrics (CPU-optimized model)
 
 ## 📝 License
 

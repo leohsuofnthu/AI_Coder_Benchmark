@@ -4,7 +4,11 @@ flask-session>=0.5.0  # Server-side session management (robust alternative to co
 gunicorn>=21.2.0 # WSGI server for production deployment  
 
 # Semantic Hierarchy Metrics Dependencies
-sentence-transformers>=2.2.0  # Fast CPU-optimized embeddings (all-MiniLM-L6-v2)
+# IMPORTANT: Install CPU-only PyTorch FIRST before installing other dependencies:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   OR: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Then install other dependencies: pip install -r requirements.txt
+sentence-transformers>=2.2.0  # Fast CPU-optimized embeddings (all-MiniLM-L6-v2) - requires CPU-only torch
 numpy>=1.24.0  # Numerical computations for cosine similarity
 scikit-learn>=1.3.0  # Cosine similarity and distance metrics
-torch>=2.0.0  # PyTorch backend for sentence-transformers (CPU support)
+# torch is NOT listed here - install CPU-only version separately using command above
