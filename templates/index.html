@@ -720,98 +720,6 @@
             }
         }
         
-        @keyframes gradientMove {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
-        }
-        
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            50% {
-                opacity: 0.6;
-                transform: scale(0.9);
-            }
-        }
-        
-        @keyframes progressGlow {
-            0%, 100% {
-                box-shadow: 0 0 15px rgba(79, 141, 245, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1);
-            }
-            50% {
-                box-shadow: 0 0 25px rgba(79, 141, 245, 0.7), inset 0 0 30px rgba(255, 255, 255, 0.2);
-            }
-        }
-        
-        /* Animation handled in CSS class */
-        
-        .progress-wrapper {
-            animation: fadeIn 0.4s ease-in;
-        }
-        
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .progress-bar {
-            border-radius: 16px;
-        }
-        
-        .progress-bar::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 60%);
-            border-radius: 16px;
-            pointer-events: none;
-        }
-        
-        .status-dots {
-            display: inline-flex;
-            gap: 4px;
-            align-items: center;
-        }
-        
-        .status-dots .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--primary-color);
-            animation: pulse 1.4s infinite;
-        }
-        
-        .progress-bar.animating {
-            background-position: 0% 50%;
-            animation: gradientMove 4s ease infinite, progressGlow 2.5s ease-in-out infinite;
-        }
-        
-        @media (prefers-reduced-motion: reduce) {
-            .progress-bar,
-            .progress-shine,
-            .status-dots .dot {
-                animation: none !important;
-                transition: width 0.3s ease !important;
-            }
-        }
     </style>
 </head>
 <body>
@@ -819,33 +727,8 @@
     <div class="loading-overlay" id="loadingOverlay">
         <div class="text-center" style="max-width: 500px; margin: 0 auto;">
             <div class="spinner mb-3"></div>
-            <h3 id="loadingTitle">Evaluating Model...</h3>
-            <p id="loadingMessage">Processing validation and metrics calculation</p>
-            <!-- Progress Bar -->
-            <div class="progress-container mt-4" style="display: none;" id="progressContainer">
-                <div class="progress-wrapper" style="position: relative; width: 100%; max-width: 500px; margin: 0 auto;">
-                    <div class="progress" style="height: 36px; background: var(--card-bg); border-radius: 18px; overflow: hidden; border: 2px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1); position: relative;">
-                        <div class="progress-bar" 
-                             id="progressBar" 
-                             role="progressbar" 
-                             style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 50%, var(--primary-color) 100%); background-size: 200% 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; border-radius: 16px;"
-                             aria-valuenow="0" 
-                             aria-valuemin="0" 
-                             aria-valuemax="100">
-                            <div class="progress-shine" style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shine 3s infinite;"></div>
-                            <span id="progressText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; color: white; font-size: 0.95rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 10; letter-spacing: 0.5px; white-space: nowrap;">0%</span>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-center">
-                        <div id="progressStatus" style="color: var(--text-primary); font-size: 0.95rem; font-weight: 500; min-height: 28px; display: flex; align-items: center; justify-content: center;">
-                            <span class="status-dots">
-                                <span class="dot"></span>
-                            </span>
-                            <span style="margin-left: 8px;">Initializing...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h3 id="loadingTitle">Processing...</h3>
+            <p id="loadingMessage">Please wait while we process your request. This may take 30-60 seconds.</p>
         </div>
     </div>
 
@@ -1620,26 +1503,14 @@
             formData.append('file', selectedFile);
             formData.append('benchmark', selectedBenchmark);
 
-            // Show loading overlay with progress bar
+            // Show loading overlay
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingTitle = document.getElementById('loadingTitle');
             const loadingMessage = document.getElementById('loadingMessage');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const progressStatus = document.getElementById('progressStatus');
             
             loadingOverlay.classList.add('active');
             loadingTitle.textContent = 'Evaluating Model...';
-            loadingMessage.textContent = 'Comparing model output against benchmark';
-            progressContainer.style.display = 'block';
-            progressBar.style.width = '0%';
-            progressBar.setAttribute('aria-valuenow', '0');
-            progressText.textContent = '0%';
-            updateProgressStatus('Initializing...');
-
-            let jobId = null;
-            let progressInterval = null;
+            loadingMessage.textContent = 'Comparing model output against benchmark. This may take 30-60 seconds.';
 
             try {
                 const response = await fetch('/api/evaluate', {
@@ -1655,137 +1526,21 @@
                         data.message || 'An error occurred during evaluation.',
                         data.suggestion || 'Please check your file format and try again.'
                     );
-                    progressContainer.style.display = 'none';
                     loadingOverlay.classList.remove('active');
                     return;
                 }
 
-                // Start polling for progress (job_id should always be provided)
-                if (data.job_id) {
-                    jobId = data.job_id;
-                    let evaluationResults = null;
-                    
-                    progressInterval = setInterval(async () => {
-                        try {
-                            const progressResponse = await fetch(`/api/evaluation-progress/${jobId}`);
-                            if (!progressResponse.ok) {
-                                clearInterval(progressInterval);
-                                showPageError(
-                                    'Progress Error',
-                                    'Failed to fetch progress',
-                                    'Please try again.'
-                                );
-                                progressContainer.style.display = 'none';
-                                loadingOverlay.classList.remove('active');
-                                return;
-                            }
-                            
-                            const progressData = await progressResponse.json();
-                            
-                            if (progressData.error && progressData.error !== 'Job not found') {
-                                clearInterval(progressInterval);
-                                showPageError(
-                                    'Evaluation Failed',
-                                    progressData.error,
-                                    'Please check your files and try again.'
-                                );
-                                progressContainer.style.display = 'none';
-                                loadingOverlay.classList.remove('active');
-                                return;
-                            }
-                            
-                            // Update progress bar with smooth animation
-                            const progress = Math.min(100, Math.max(0, progressData.progress || 0));
-                            const roundedProgress = Math.round(progress);
-                            
-                            // Smooth width transition
-                            progressBar.style.width = `${progress}%`;
-                            progressBar.setAttribute('aria-valuenow', progress);
-                            progressText.textContent = `${roundedProgress}%`;
-                            
-                            // Update status with animation
-                            updateProgressStatus(progressData.status || 'Processing...');
-                            
-                            // Add glow effect when progress is active
-                            if (progress > 0 && progress < 100) {
-                                progressBar.classList.add('animating');
-                            } else {
-                                progressBar.classList.remove('animating');
-                            }
-                            
-                            // If complete, stop polling and display results
-                            if (progressData.complete) {
-                                clearInterval(progressInterval);
-                                
-                                if (progressData.error) {
-                                    showPageError(
-                                        'Evaluation Failed',
-                                        progressData.error,
-                                        'Please check your files and try again.'
-                                    );
-                                    progressContainer.style.display = 'none';
-                                    loadingOverlay.classList.remove('active');
-                                } else if (progressData.results) {
-                                    // Store results and show completion
-                                    evaluationResults = progressData.results;
-                                    // Small delay to show 100% before hiding
-                                    setTimeout(() => {
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                        displayResults(evaluationResults);
-                                    }, 500);
-                                } else {
-                                    // Complete but no results yet (shouldn't happen)
-                                    progressStatus.textContent = 'Waiting for results...';
-                                    // Poll a few more times for results
-                                    let retryCount = 0;
-                                    const retryInterval = setInterval(async () => {
-                                        retryCount++;
-                                        const retryResponse = await fetch(`/api/evaluation-progress/${jobId}`);
-                                        const retryData = await retryResponse.json();
-                                        if (retryData.results) {
-                                            clearInterval(retryInterval);
-                                            progressContainer.style.display = 'none';
-                                            loadingOverlay.classList.remove('active');
-                                            displayResults(retryData.results);
-                                        } else if (retryCount > 10) {
-                                            clearInterval(retryInterval);
-                                            showPageError(
-                                                'Results Not Available',
-                                                'Evaluation completed but results are not available.',
-                                                'Please try again.'
-                                            );
-                                            progressContainer.style.display = 'none';
-                                            loadingOverlay.classList.remove('active');
-                                        }
-                                    }, 1000);
-                                }
-                            }
-                        } catch (progressError) {
-                            console.error('Progress polling error:', progressError);
-                            // Continue polling even if one request fails
-                        }
-                    }, 800); // Poll every 800ms (reduced frequency for efficiency)
-                } else {
-                    // No job_id - fallback (shouldn't happen with new implementation)
-                    showPageError(
-                        'Evaluation Error',
-                        'Job ID not received from server',
-                        'Please try again.'
-                    );
-                    progressContainer.style.display = 'none';
-                    loadingOverlay.classList.remove('active');
-                }
+                // Results are returned directly - no polling needed
+                loadingOverlay.classList.remove('active');
+                displayResults(data);
+                
             } catch (error) {
-                if (progressInterval) {
-                    clearInterval(progressInterval);
-                }
                 let errorTitle = 'Evaluation Failed';
                 let errorMsg = '';
                 let suggestion = '';
                 
-                if (error.name === 'AbortError') {
-                    errorMsg = 'Request timeout! The evaluation took too long (>2 minutes).';
+                if (error.name === 'AbortError' || error.message.includes('timeout')) {
+                    errorMsg = 'Request timeout! The evaluation took too long.';
                     suggestion = 'Try with a smaller file or simpler benchmark.';
                 } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
                     errorMsg = 'Network error! Unable to connect to the server.';
@@ -1796,20 +1551,8 @@
                 }
                 
                 console.error('[ERROR] Evaluation error:', error);
-                console.error('[ERROR] Error stack:', error.stack);
-                
                 showPageError(errorTitle, errorMsg, suggestion);
-            } finally {
-                // Always remove loading overlay, even on error
-                const loadingOverlay = document.getElementById('loadingOverlay');
-                const progressContainer = document.getElementById('progressContainer');
-                if (progressContainer) {
-                    progressContainer.style.display = 'none';
-                }
-                if (loadingOverlay) {
-                    loadingOverlay.classList.remove('active');
-                    console.log('[DEBUG] Loading overlay removed');
-                }
+                loadingOverlay.classList.remove('active');
             }
         });
 
@@ -2606,26 +2349,14 @@
                 const formData = new FormData();
                 formData.append('file', selectedSingleHierarchyFile);
                 
-                // Show loading overlay with progress
+                // Show loading overlay
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 const loadingTitle = document.getElementById('loadingTitle');
                 const loadingMessage = document.getElementById('loadingMessage');
-                const progressContainer = document.getElementById('progressContainer');
-                const progressBar = document.getElementById('progressBar');
-                const progressText = document.getElementById('progressText');
-                const progressStatus = document.getElementById('progressStatus');
                 
                 loadingOverlay.classList.add('active');
                 loadingTitle.textContent = 'Calculating Metrics...';
-                loadingMessage.textContent = 'Computing semantic metrics for hierarchy';
-                progressContainer.style.display = 'block';
-                progressBar.style.width = '0%';
-                progressBar.setAttribute('aria-valuenow', '0');
-                progressText.textContent = '0%';
-                updateProgressStatus('Initializing...');
-                
-                let jobId = null;
-                let progressInterval = null;
+                loadingMessage.textContent = 'Computing semantic metrics for hierarchy. This may take 30-60 seconds.';
                 
                 try {
                     const response = await fetch('/api/evaluate-single-hierarchy', {
@@ -2641,248 +2372,21 @@
                             data.message || 'An error occurred during metrics calculation.',
                             data.suggestion || 'Please check your file and try again.'
                         );
-                        progressContainer.style.display = 'none';
                         loadingOverlay.classList.remove('active');
                         return;
                     }
                     
-                    // Start polling for progress
-                    if (data.job_id) {
-                        jobId = data.job_id;
-                        let evaluationResults = null;
-                        
-                        // Small delay before first poll to ensure backend has initialized the job
-                        // This helps avoid race conditions on slower connections or servers (like Render)
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Reset error count
-                        window.progressErrorCount = 0;
-                        
-                        progressInterval = setInterval(async () => {
-                            try {
-                                // Create abort controller for timeout
-                                const controller = new AbortController();
-                                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-                                
-                                const progressResponse = await fetch(`/api/hierarchy-progress/${jobId}`, {
-                                    method: 'GET',
-                                    headers: {
-                                        'Accept': 'application/json'
-                                    },
-                                    signal: controller.signal
-                                });
-                                
-                                clearTimeout(timeoutId);
-                                
-                                // Handle non-OK responses
-                                if (!progressResponse.ok) {
-                                    // Don't fail immediately on 404 - job might not be created yet
-                                    if (progressResponse.status === 404) {
-                                        console.warn(`Job ${jobId} not found yet, will retry...`);
-                                        return; // Continue polling
-                                    }
-                                    
-                                    // For other errors, try to get error message
-                                    let errorMsg = `HTTP ${progressResponse.status}`;
-                                    try {
-                                        const errorData = await progressResponse.json();
-                                        errorMsg = errorData.error || errorMsg;
-                                    } catch (e) {
-                                        errorMsg = await progressResponse.text() || errorMsg;
-                                    }
-                                    
-                                    console.error('Progress fetch error:', errorMsg);
-                                    
-                                    // Only stop polling after multiple failures
-                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
-                                    window.progressErrorCount++;
-                                    
-                                    if (window.progressErrorCount >= 5) {
-                                        clearInterval(progressInterval);
-                                        showPageError(
-                                            'Progress Error',
-                                            `Failed to fetch progress: ${errorMsg}`,
-                                            'The calculation may still be running. Please refresh the page and check again.'
-                                        );
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                        return;
-                                    }
-                                    return; // Continue polling on transient errors
-                                }
-                                
-                                // Reset error count on success
-                                window.progressErrorCount = 0;
-                                
-                                const progressData = await progressResponse.json();
-                                
-                                // Handle job not found (might be timing issue)
-                                if (progressData.error === 'Job not found' || progressData.error === 'Job not found - may still be initializing') {
-                                    console.warn('Job not found in store, will retry...');
-                                    // Increment error count but don't fail immediately (allow time for initialization)
-                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
-                                    window.progressErrorCount++;
-                                    
-                                    // Only fail after many retries (32+ seconds at 800ms intervals)
-                                    if (window.progressErrorCount >= 40) {
-                                        clearInterval(progressInterval);
-                                        showPageError(
-                                            'Job Not Found',
-                                            'The calculation job was not found on the server.',
-                                            'Please try submitting the file again.'
-                                        );
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                    }
-                                    return; // Continue polling
-                                }
-                                
-                                if (progressData.error && progressData.error !== 'Job not found' && progressData.error !== 'Job not found - may still be initializing') {
-                                    clearInterval(progressInterval);
-                                    showPageError(
-                                        'Metrics Calculation Failed',
-                                        progressData.error,
-                                        'Please check your file and try again.'
-                                    );
-                                    progressContainer.style.display = 'none';
-                                    loadingOverlay.classList.remove('active');
-                                    return;
-                                }
-                                
-                                // Update progress bar with smooth animation
-                                const progress = Math.min(100, Math.max(0, progressData.progress || 0));
-                                const roundedProgress = Math.round(progress);
-                                
-                                // Smooth width transition
-                                progressBar.style.width = `${progress}%`;
-                                progressBar.setAttribute('aria-valuenow', progress);
-                                progressText.textContent = `${roundedProgress}%`;
-                                
-                                // Update status with animation
-                                updateProgressStatus(progressData.status || 'Processing...');
-                                
-                                // Add glow effect when progress is active
-                                if (progress > 0 && progress < 100) {
-                                    progressBar.classList.add('animating');
-                                } else {
-                                    progressBar.classList.remove('animating');
-                                }
-                                
-                                // If complete, stop polling and display results
-                                if (progressData.complete) {
-                                    clearInterval(progressInterval);
-                                    
-                                    if (progressData.error) {
-                                        showPageError(
-                                            'Metrics Calculation Failed',
-                                            progressData.error,
-                                            'Please check your file and try again.'
-                                        );
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                    } else if (progressData.results) {
-                                        evaluationResults = progressData.results;
-                                        console.log('Results received:', evaluationResults);
-                                        setTimeout(() => {
-                                            progressContainer.style.display = 'none';
-                                            loadingOverlay.classList.remove('active');
-                                            displaySingleHierarchyResults(evaluationResults);
-                                        }, 500);
-                                    } else {
-                                        // Complete but no results - might be a timing issue
-                                        console.warn('Job complete but no results found. Progress data:', progressData);
-                                        // Try one more time after a short delay
-                                        setTimeout(async () => {
-                                            try {
-                                                const finalResponse = await fetch(`/api/hierarchy-progress/${jobId}`);
-                                                if (finalResponse.ok) {
-                                                    const finalData = await finalResponse.json();
-                                                    if (finalData.results) {
-                                                        progressContainer.style.display = 'none';
-                                                        loadingOverlay.classList.remove('active');
-                                                        displaySingleHierarchyResults(finalData.results);
-                                                        return;
-                                                    }
-                                                }
-                                            } catch (e) {
-                                                console.error('Final fetch error:', e);
-                                            }
-                                            // If still no results, show error
-                                            showPageError(
-                                                'Results Not Available',
-                                                'Calculation completed but results could not be retrieved.',
-                                                'Please try again.'
-                                            );
-                                            progressContainer.style.display = 'none';
-                                            loadingOverlay.classList.remove('active');
-                                        }, 1000);
-                                    }
-                                }
-                            } catch (progressError) {
-                                console.error('Progress polling error:', progressError);
-                                
-                                // Handle network errors, timeouts, etc.
-                                if (progressError.name === 'AbortError' || progressError.name === 'TimeoutError') {
-                                    console.warn('Progress request timed out, will retry...');
-                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
-                                    window.progressErrorCount++;
-                                    
-                                    // Only fail after many timeouts (40+ seconds)
-                                    if (window.progressErrorCount >= 50) {
-                                        clearInterval(progressInterval);
-                                        showPageError(
-                                            'Connection Timeout',
-                                            'The progress request timed out repeatedly.',
-                                            'The calculation may still be running. Please refresh the page and check again.'
-                                        );
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                    }
-                                    return; // Continue polling
-                                } else if (progressError.name === 'TypeError' && progressError.message.includes('fetch')) {
-                                    // Network error
-                                    console.error('Network error during progress fetch:', progressError);
-                                    if (!window.progressErrorCount) window.progressErrorCount = 0;
-                                    window.progressErrorCount++;
-                                    
-                                    if (window.progressErrorCount >= 10) {
-                                        clearInterval(progressInterval);
-                                        showPageError(
-                                            'Network Error',
-                                            'Failed to connect to the server.',
-                                            'Please check your internet connection and try again.'
-                                        );
-                                        progressContainer.style.display = 'none';
-                                        loadingOverlay.classList.remove('active');
-                                    }
-                                    return; // Continue polling
-                                } else {
-                                    // Other errors - log and continue
-                                    console.error('Unexpected error during progress polling:', progressError);
-                                }
-                            }
-                        }, 800);  // Increased polling interval to 800ms
-                    } else {
-                        console.error('No job_id received from server');
-                        showPageError(
-                            'Server Error',
-                            'No job ID returned from server.',
-                            'Please try again.'
-                        );
-                        progressContainer.style.display = 'none';
-                        loadingOverlay.classList.remove('active');
-                    }
+                    // Results are returned directly - no polling needed
+                    loadingOverlay.classList.remove('active');
+                    displaySingleHierarchyResults(data);
+                    
                 } catch (error) {
                     console.error('Error in evaluation request:', error);
-                    if (progressInterval) {
-                        clearInterval(progressInterval);
-                    }
                     showPageError(
                         'Metrics Calculation Failed',
                         error.message || 'An unexpected error occurred.',
                         'Please check your file and try again.'
                     );
-                    progressContainer.style.display = 'none';
                     loadingOverlay.classList.remove('active');
                 }
             });
@@ -3098,16 +2602,14 @@
             formData.append('benchmark_file', benchmarkHierarchyFile);
             formData.append('model_file', modelHierarchyFile);
 
-            // Show loading overlay (simple spinner, no progress bar needed)
+            // Show loading overlay (simple spinner)
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingTitle = document.getElementById('loadingTitle');
             const loadingMessage = document.getElementById('loadingMessage');
-            const progressContainer = document.getElementById('progressContainer');
             
             loadingOverlay.classList.add('active');
             loadingTitle.textContent = 'Comparing Hierarchies...';
             loadingMessage.textContent = 'Extracting hierarchy structures';
-            progressContainer.style.display = 'none';
 
             try {
                 const response = await fetch('/api/compare-hierarchy', {
@@ -3237,17 +2739,6 @@
         }
 
         // Helper function to update progress status with animation
-        function updateProgressStatus(status) {
-            const progressStatus = document.getElementById('progressStatus');
-            if (!progressStatus) return;
-            
-            progressStatus.innerHTML = `
-                <span class="status-dots">
-                    <span class="dot"></span>
-                </span>
-                <span style="margin-left: 8px;">${status}</span>
-            `;
-        }
         
         function displayTree(containerId, tree) {
             const container = document.getElementById(containerId);

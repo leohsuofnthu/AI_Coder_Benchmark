@@ -15,18 +15,8 @@ import json
 import csv
 import io
 import os
-import threading
-import time
 from evaluate_model import CodebookEvaluator
 from hierarchy_evaluator import HierarchyEvaluator
-
-# In-memory progress store for hierarchy evaluation (thread-safe)
-hierarchy_progress_store = {}
-progress_lock = threading.Lock()
-
-# In-memory progress store for code assignment evaluation (thread-safe)
-evaluation_progress_store = {}
-evaluation_progress_lock = threading.Lock()
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size (reduced for Render free tier)
@@ -167,299 +157,165 @@ def evaluate():
         file.save(str(upload_path))
         print(f"[UPLOAD] File saved to: {upload_path}")
         
-        # Initialize progress tracking
-        import uuid
-        job_id = str(uuid.uuid4())
-        with evaluation_progress_lock:
-            evaluation_progress_store[job_id] = {
-                'progress': 0,
-                'status': 'Initializing...',
-                'complete': False,
-                'error': None
-            }
-        
-        # Store file paths for background thread
         upload_path_str = str(upload_path)
         benchmark_path_str = benchmark_path
         
-        # Progress callback with time-based throttling for efficiency
-        last_update_time = [0]  # Use list to allow modification in nested function
-        last_progress = [0]
-        MIN_UPDATE_INTERVAL = 0.5  # Update at most every 500ms
-        MIN_PROGRESS_DIFF = 3.0  # Update only if progress changed by at least 3%
-        
-        def update_progress(progress, status):
+        # Run evaluation synchronously
+        try:
+            evaluator = CodebookEvaluator(
+                benchmark_path=benchmark_path_str,
+                model_output_path=upload_path_str,
+                progress_callback=None  # No progress tracking
+            )
+            
+            # Load and process data (includes codebook validation)
+            evaluator.load_data()
+            aligned_data = evaluator.align_responses()
+            
+            if not aligned_data:
+                Path(upload_path_str).unlink(missing_ok=True)
+                return jsonify({
+                    'error': 'No aligned responses found. Check RespondentIDs and QuestionIDs match.'
+                }), 400
+            
+            # Calculate metrics
+            evaluator.calculate_metrics(aligned_data)
+            
+            # Prepare response
+            overall = evaluator.metrics['overall']
+            
+            # Get top/bottom performing codes
+            code_performance = []
+            for code_key, stats in evaluator.metrics['per_code'].items():
+                tp, fp, fn = stats['tp'], stats['fp'], stats['fn']
+                support = stats['support']
+                
+                prec = tp / (tp + fp) if (tp + fp) > 0 else 0
+                rec = tp / (tp + fn) if (tp + fn) > 0 else 0
+                f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0
+                
+                code_info = evaluator.codebook.get(code_key, {})
+                code_performance.append({
+                    'code': code_key,
+                    'description': code_info.get('description', 'Unknown'),
+                    'depth': code_info.get('depth', 0),
+                    'f1': f1,
+                    'precision': prec,
+                    'recall': rec,
+                    'support': support,
+                    'tp': tp,
+                    'fp': fp,
+                    'fn': fn
+                })
+            
+            # Sort by F1 score
+            code_performance.sort(key=lambda x: x['f1'], reverse=True)
+            
+            # Code distribution analysis
+            depth_stats = {}
+            for code in code_performance:
+                depth = code['depth']
+                if depth not in depth_stats:
+                    depth_stats[depth] = {'count': 0, 'avg_f1': 0}
+                depth_stats[depth]['count'] += 1
+                depth_stats[depth]['avg_f1'] += code['f1']
+            
+            for depth in depth_stats:
+                depth_stats[depth]['avg_f1'] /= depth_stats[depth]['count']
+            
+            # Get all mismatches (for CSV download only, not for display)
+            all_mismatches = evaluator.metrics.get('mismatches', [])
+            
+            # Load verbatims from benchmark - keyed by (respondent_id, question_id)
+            import xml.etree.ElementTree as ET
+            verbatims = {}
+            benchmark_tree = ET.parse(benchmark_path_str)
+            benchmark_root = benchmark_tree.getroot()
+            
+            for question in benchmark_root.findall('.//Question'):
+                question_id_elem = question.find('QuestionID')
+                if question_id_elem is None:
+                    continue
+                question_id = question_id_elem.text
+                
+                for response in question.findall('.//Response'):
+                    respondent = response.find('DRORespondent')
+                    verbatim = response.find('DROVerbatim')
+                    if respondent is not None and verbatim is not None:
+                        key = (respondent.text, question_id)
+                        verbatims[key] = verbatim.text or ""
+            
+            # Prepare response data
+            response_data = {
+                'success': True,
+                'benchmark': {
+                    'id': benchmark_id,
+                    'name': BENCHMARKS[benchmark_id]['name'],
+                    'description': BENCHMARKS[benchmark_id]['description']
+                },
+                'overall': {
+                    'coded_only': overall.get('coded_only', {}),
+                    'n_responses': overall['n_responses'],
+                    'n_mismatches': overall.get('n_mismatches', 0),
+                    'total_tp': overall['total_tp'],
+                    'total_fp': overall['total_fp'],
+                    'total_fn': overall['total_fn'],
+                    'uncoded_classification': overall.get('uncoded_classification', {}),
+                    'uncoded_benchmark': overall.get('uncoded_benchmark', 0),
+                    'uncoded_model': overall.get('uncoded_model', 0),
+                    'uncoded_both': overall.get('uncoded_both', 0),
+                    'question_uncoded_breakdown': overall.get('question_uncoded_breakdown', [])
+                },
+                'top_codes': code_performance[:10],
+                'bottom_codes': sorted(code_performance, key=lambda x: x['f1'])[:10],
+                'depth_stats': depth_stats,
+                'has_mismatches': len(all_mismatches) > 0,
+                'mismatch_count': len(all_mismatches)
+            }
+            
+            # Enrich mismatches with verbatims
+            mismatch_keys = {(m['respondent_id'], m['question_id']) for m in all_mismatches}
+            for mismatch in all_mismatches:
+                key = (mismatch['respondent_id'], mismatch['question_id'])
+                mismatch['verbatim'] = verbatims.get(key, 'N/A')
+                mismatch['missed_descriptions'] = [
+                    evaluator.codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch['missed_codes']
+                ]
+                mismatch['extra_descriptions'] = [
+                    evaluator.codebook.get(code, {}).get('description', 'Unknown')
+                    for code in mismatch['extra_codes']
+                ]
+            
+            # Store in session for CSV download
             try:
-                current_time = time.time()
-                time_since_update = current_time - last_update_time[0]
-                progress_diff = abs(progress - last_progress[0])
-                
-                # Update only if:
-                # 1. Enough time has passed (500ms), OR
-                # 2. Progress changed significantly (3%), OR
-                # 3. Status changed (important updates - check without lock for efficiency)
-                current_status = ''
-                try:
-                    with evaluation_progress_lock:
-                        if job_id in evaluation_progress_store:
-                            current_status = evaluation_progress_store[job_id].get('status', '')
-                except:
-                    pass
-                
-                should_update = (
-                    time_since_update >= MIN_UPDATE_INTERVAL or
-                    progress_diff >= MIN_PROGRESS_DIFF or
-                    status != current_status
-                )
-                
-                if should_update:
-                    with evaluation_progress_lock:
-                        if job_id in evaluation_progress_store:
-                            evaluation_progress_store[job_id].update({
-                                'progress': progress,
-                                'status': status,
-                                'complete': False,
-                                'error': None
-                            })
-                    last_update_time[0] = current_time
-                    last_progress[0] = progress
-            except Exception:
-                # Silently fail to avoid slowing down evaluation
-                pass
-        
-        # Run evaluation in background thread
-        def run_evaluation():
-            try:
-                evaluator = CodebookEvaluator(
-                    benchmark_path=benchmark_path_str,
-                    model_output_path=upload_path_str,
-                    progress_callback=update_progress
-                )
-                
-                # Load and process data (includes codebook validation)
-                evaluator.load_data()
-                aligned_data = evaluator.align_responses()
-                
-                if not aligned_data:
-                    with evaluation_progress_lock:
-                        if job_id in evaluation_progress_store:
-                            evaluation_progress_store[job_id].update({
-                                'progress': 0,
-                                'status': 'Error: No aligned responses found',
-                                'complete': True,
-                                'error': 'No aligned responses found. Check RespondentIDs and QuestionIDs match.'
-                            })
-                    return
-                
-                # Calculate metrics
-                evaluator.calculate_metrics(aligned_data)
-                
-                update_progress(95, "Preparing results...")
-                
-                # Prepare response
-                overall = evaluator.metrics['overall']
-                
-                # Get top/bottom performing codes
-                code_performance = []
-                for code_key, stats in evaluator.metrics['per_code'].items():
-                    tp, fp, fn = stats['tp'], stats['fp'], stats['fn']
-                    support = stats['support']
-                    
-                    prec = tp / (tp + fp) if (tp + fp) > 0 else 0
-                    rec = tp / (tp + fn) if (tp + fn) > 0 else 0
-                    f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0
-                    
-                    code_info = evaluator.codebook.get(code_key, {})
-                    code_performance.append({
-                        'code': code_key,
-                        'description': code_info.get('description', 'Unknown'),
-                        'depth': code_info.get('depth', 0),
-                        'f1': f1,
-                        'precision': prec,
-                        'recall': rec,
-                        'support': support,
-                        'tp': tp,
-                        'fp': fp,
-                        'fn': fn
-                    })
-                
-                # Sort by F1 score
-                code_performance.sort(key=lambda x: x['f1'], reverse=True)
-                
-                # Code distribution analysis
-                depth_stats = {}
-                for code in code_performance:
-                    depth = code['depth']
-                    if depth not in depth_stats:
-                        depth_stats[depth] = {'count': 0, 'avg_f1': 0}
-                    depth_stats[depth]['count'] += 1
-                    depth_stats[depth]['avg_f1'] += code['f1']
-                
-                for depth in depth_stats:
-                    depth_stats[depth]['avg_f1'] /= depth_stats[depth]['count']
-                
-                # Get all mismatches (for CSV download only, not for display)
-                all_mismatches = evaluator.metrics.get('mismatches', [])
-                
-                # Load verbatims from benchmark - keyed by (respondent_id, question_id)
-                import xml.etree.ElementTree as ET
-                verbatims = {}
-                benchmark_tree = ET.parse(benchmark_path_str)
-                benchmark_root = benchmark_tree.getroot()
-                
-                for question in benchmark_root.findall('.//Question'):
-                    question_id_elem = question.find('QuestionID')
-                    if question_id_elem is None:
-                        continue
-                    question_id = question_id_elem.text
-                    
-                    for response in question.findall('.//Response'):
-                        respondent = response.find('DRORespondent')
-                        verbatim = response.find('DROVerbatim')
-                        if respondent is not None and verbatim is not None:
-                            key = (respondent.text, question_id)
-                            verbatims[key] = verbatim.text or ""
-                
-                # Prepare response data
-                response_data = {
-                    'success': True,
-                    'benchmark': {
-                        'id': benchmark_id,
-                        'name': BENCHMARKS[benchmark_id]['name'],
-                        'description': BENCHMARKS[benchmark_id]['description']
-                    },
-                    'overall': {
-                        'coded_only': overall.get('coded_only', {}),
-                        'n_responses': overall['n_responses'],
-                        'n_mismatches': overall.get('n_mismatches', 0),
-                        'total_tp': overall['total_tp'],
-                        'total_fp': overall['total_fp'],
-                        'total_fn': overall['total_fn'],
-                        'uncoded_classification': overall.get('uncoded_classification', {}),
-                        'uncoded_benchmark': overall.get('uncoded_benchmark', 0),
-                        'uncoded_model': overall.get('uncoded_model', 0),
-                        'uncoded_both': overall.get('uncoded_both', 0),
-                        'question_uncoded_breakdown': overall.get('question_uncoded_breakdown', [])
-                    },
-                    'top_codes': code_performance[:10],
-                    'bottom_codes': sorted(code_performance, key=lambda x: x['f1'])[:10],
-                    'depth_stats': depth_stats,
-                    'has_mismatches': len(all_mismatches) > 0,
-                    'mismatch_count': len(all_mismatches)
-                }
-                
-                # Enrich mismatches with verbatims
-                mismatch_keys = {(m['respondent_id'], m['question_id']) for m in all_mismatches}
-                for mismatch in all_mismatches:
-                    key = (mismatch['respondent_id'], mismatch['question_id'])
-                    mismatch['verbatim'] = verbatims.get(key, 'N/A')
-                    mismatch['missed_descriptions'] = [
-                        evaluator.codebook.get(code, {}).get('description', 'Unknown')
-                        for code in mismatch['missed_codes']
-                    ]
-                    mismatch['extra_descriptions'] = [
-                        evaluator.codebook.get(code, {}).get('description', 'Unknown')
-                        for code in mismatch['extra_codes']
-                    ]
-                
-                # Store in session for CSV download
-                try:
-                    session['all_mismatches'] = all_mismatches
-                    session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
-                    session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
-                                           for k, v in evaluator.codebook.items()}
-                except Exception as session_error:
-                    print(f"[SESSION] Error storing session: {session_error}")
-                
-                # Store results
-                with evaluation_progress_lock:
-                    if job_id in evaluation_progress_store:
-                        evaluation_progress_store[job_id].update({
-                            'progress': 100,
-                            'status': 'Complete!',
-                            'complete': True,
-                            'error': None,
-                            'results': response_data
-                        })
-                
-                # Clean up files
-                Path(upload_path_str).unlink(missing_ok=True)
-                
-            except ValueError as ve:
-                # Mark as error
-                error_msg = str(ve)
-                with evaluation_progress_lock:
-                    if job_id in evaluation_progress_store:
-                        evaluation_progress_store[job_id].update({
-                            'progress': 0,
-                            'status': f'Error: {error_msg}',
-                            'complete': True,
-                            'error': error_msg
-                        })
-                # Clean up files
-                Path(upload_path_str).unlink(missing_ok=True)
-            except Exception as eval_error:
-                # Mark as error
-                with evaluation_progress_lock:
-                    if job_id in evaluation_progress_store:
-                        evaluation_progress_store[job_id].update({
-                            'progress': 0,
-                            'status': f'Error: {str(eval_error)}',
-                            'complete': True,
-                            'error': str(eval_error)
-                        })
-                # Clean up files
-                Path(upload_path_str).unlink(missing_ok=True)
-        
-        # Start evaluation in background thread
-        eval_thread = threading.Thread(target=run_evaluation)
-        eval_thread.daemon = True
-        eval_thread.start()
-        
-        # Return job_id immediately so frontend can poll for progress
-        return jsonify({
-            'job_id': job_id,
-            'status': 'started',
-            'message': 'Evaluation started. Poll /api/evaluation-progress/{job_id} for progress.'
-        })
+                session['all_mismatches'] = all_mismatches
+                session['benchmark_name'] = BENCHMARKS[benchmark_id]['name']
+                session['codebook'] = {k: {'description': v.get('description', 'Unknown')} 
+                                       for k, v in evaluator.codebook.items()}
+            except Exception as session_error:
+                print(f"[SESSION] Error storing session: {session_error}")
+            
+            # Clean up files
+            Path(upload_path_str).unlink(missing_ok=True)
+            
+            return jsonify(response_data)
+            
+        except ValueError as ve:
+            # Clean up files
+            Path(upload_path_str).unlink(missing_ok=True)
+            return jsonify({'error': str(ve)}), 400
+        except Exception as eval_error:
+            # Clean up files
+            Path(upload_path_str).unlink(missing_ok=True)
+            raise eval_error
         
     except Exception as e:
         import traceback
         error_msg = f"Evaluation error: {str(e)}"
         print(error_msg)
         print(traceback.format_exc())
-        # Mark as error if job_id exists
-        try:
-            with evaluation_progress_lock:
-                # Try to find and mark any active job as error
-                for jid, data in evaluation_progress_store.items():
-                    if not data.get('complete'):
-                        evaluation_progress_store[jid].update({
-                            'progress': 0,
-                            'status': f'Error: {error_msg}',
-                            'complete': True,
-                            'error': error_msg
-                        })
-        except:
-            pass
         return jsonify({'error': error_msg, 'details': traceback.format_exc()}), 500
-
-
-@app.route('/api/evaluation-progress/<job_id>')
-def get_evaluation_progress(job_id):
-    """Get progress for code assignment evaluation job."""
-    try:
-        with evaluation_progress_lock:
-            if job_id not in evaluation_progress_store:
-                return jsonify({'error': 'Job not found'}), 404
-            
-            progress_data = evaluation_progress_store[job_id].copy()
-            # Include results if complete
-            if progress_data.get('complete') and progress_data.get('results'):
-                progress_data['results'] = progress_data['results']
-            return jsonify(progress_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/download-mismatches')
@@ -615,156 +471,62 @@ def evaluate_single_hierarchy():
         upload_folder = Path(app.config['UPLOAD_FOLDER'])
         file_path = upload_folder / file.filename
         file.save(str(file_path))
-        
-        # Initialize progress tracking
-        import uuid
-        job_id = str(uuid.uuid4())
-        
-        # Initialize progress store entry immediately to avoid race condition
-        with progress_lock:
-            hierarchy_progress_store[job_id] = {
-                'progress': 5,
-                'status': 'Initializing...',
-                'complete': False,
-                'error': None,
-                'results': None
-            }
-        
-        # Progress callback with time-based throttling for efficiency
-        last_update_time = [0]
-        last_progress = [5]  # Start at 5 since we initialized at 5%
-        MIN_UPDATE_INTERVAL = 0.5  # Update at most every 500ms
-        MIN_PROGRESS_DIFF = 3.0  # Update only if progress changed by at least 3%
-        
-        def update_progress(progress, status):
-            try:
-                current_time = time.time()
-                time_since_update = current_time - last_update_time[0]
-                progress_diff = abs(progress - last_progress[0])
-                
-                # Update only if enough time passed, significant progress change, or status change
-                current_status = ''
-                try:
-                    with progress_lock:
-                        if job_id in hierarchy_progress_store:
-                            current_status = hierarchy_progress_store[job_id].get('status', '')
-                except:
-                    pass
-                
-                should_update = (
-                    time_since_update >= MIN_UPDATE_INTERVAL or
-                    progress_diff >= MIN_PROGRESS_DIFF or
-                    status != current_status
-                )
-                
-                if should_update:
-                    with progress_lock:
-                        if job_id in hierarchy_progress_store:
-                            hierarchy_progress_store[job_id].update({
-                                'progress': progress,
-                                'status': status,
-                                'complete': False,
-                                'error': None
-                            })
-                    last_update_time[0] = current_time
-                    last_progress[0] = progress
-            except Exception:
-                pass
-        
-        # Store file path for background thread
         file_path_str = str(file_path)
         
-        # Run evaluation in background thread
-        def run_evaluation():
-            try:
-                from hierarchy_evaluator import HierarchyEvaluator, HierarchyMetricsEvaluator
-                
-                # Build tree
-                update_progress(10, "Parsing XML and building hierarchy tree...")
-                evaluator = HierarchyEvaluator(file_path_str, file_path_str)  # Use same file for both
-                root_nodes = evaluator.extract_hierarchy(file_path_str)
-                
-                if not root_nodes:
-                    raise ValueError("No hierarchy tree could be built from the XML file")
-                
-                # Create virtual root if multiple root nodes
-                if len(root_nodes) > 1:
-                    from hierarchy_evaluator import HierarchyNode
-                    virtual_root = HierarchyNode('root', 'Root', 0, False, 0)
-                    virtual_root.children = root_nodes
-                    for node in root_nodes:
-                        node.parent = virtual_root
-                    root = virtual_root
-                else:
-                    root = root_nodes[0]
-                
-                # Compute metrics (scale progress from 30% to 95%)
-                def scaled_progress(progress, status):
-                    # Scale from compute_metrics range (5-90%) to our range (30-95%)
-                    scaled = 30 + (progress - 5) * (65 / 85) if progress >= 5 else 30
-                    update_progress(scaled, status)
-                
-                metrics_evaluator = HierarchyMetricsEvaluator(progress_callback=scaled_progress)
-                metrics = metrics_evaluator.compute_metrics(root, file_path_str)
-                
-                if metrics is None:
-                    raise ValueError("Failed to compute metrics - metrics returned None. Check if hierarchy has valid structure.")
-                
-                # Verify metrics structure
-                if not isinstance(metrics, dict):
-                    raise ValueError(f"Invalid metrics type: {type(metrics)}, expected dict")
-                
-                # Prepare response
-                update_progress(95, "Preparing results...")
-                response_data = {
-                    'success': True,
-                    'metrics': metrics,
-                    'tree': root.to_dict() if hasattr(root, 'to_dict') else None,
-                    'file_name': file.filename
-                }
-                
-                print(f"[METRICS] Results prepared: success={response_data['success']}, metrics_keys={list(metrics.keys()) if metrics else 'None'}")
-                
-                # Store results
-                with progress_lock:
-                    if job_id in hierarchy_progress_store:
-                        hierarchy_progress_store[job_id].update({
-                            'progress': 100,
-                            'status': 'Complete!',
-                            'complete': True,
-                            'error': None,
-                            'results': response_data
-                        })
-                
-                # Clean up file
+        try:
+            from hierarchy_evaluator import HierarchyEvaluator, HierarchyMetricsEvaluator
+            
+            # Build tree
+            evaluator = HierarchyEvaluator(file_path_str, file_path_str)  # Use same file for both
+            root_nodes = evaluator.extract_hierarchy(file_path_str)
+            
+            if not root_nodes:
                 Path(file_path_str).unlink(missing_ok=True)
-                
-            except Exception as eval_error:
-                # Mark as error
-                with progress_lock:
-                    if job_id in hierarchy_progress_store:
-                        hierarchy_progress_store[job_id].update({
-                            'progress': 0,
-                            'status': f'Error: {str(eval_error)}',
-                            'complete': True,
-                            'error': str(eval_error),
-                            'results': None
-                        })
-                
-                # Clean up file on error
+                return jsonify({'error': 'No hierarchy tree could be built from the XML file'}), 400
+            
+            # Create virtual root if multiple root nodes
+            if len(root_nodes) > 1:
+                from hierarchy_evaluator import HierarchyNode
+                virtual_root = HierarchyNode('root', 'Root', 0, False, 0)
+                virtual_root.children = root_nodes
+                for node in root_nodes:
+                    node.parent = virtual_root
+                root = virtual_root
+            else:
+                root = root_nodes[0]
+            
+            # Compute metrics (no progress callback)
+            metrics_evaluator = HierarchyMetricsEvaluator(progress_callback=None)
+            metrics = metrics_evaluator.compute_metrics(root, file_path_str)
+            
+            if metrics is None:
                 Path(file_path_str).unlink(missing_ok=True)
-        
-        # Start evaluation in background thread
-        eval_thread = threading.Thread(target=run_evaluation)
-        eval_thread.daemon = True
-        eval_thread.start()
-        
-        # Return job_id immediately
-        return jsonify({
-            'job_id': job_id,
-            'status': 'started',
-            'message': 'Evaluation started. Poll /api/hierarchy-progress/{job_id} for progress.'
-        })
+                return jsonify({'error': 'Failed to compute metrics. Check if hierarchy has valid structure.'}), 400
+            
+            # Verify metrics structure
+            if not isinstance(metrics, dict):
+                Path(file_path_str).unlink(missing_ok=True)
+                return jsonify({'error': f'Invalid metrics type: {type(metrics)}, expected dict'}), 500
+            
+            # Prepare response
+            response_data = {
+                'success': True,
+                'metrics': metrics,
+                'tree': root.to_dict() if hasattr(root, 'to_dict') else None,
+                'file_name': file.filename
+            }
+            
+            print(f"[METRICS] Results prepared: success={response_data['success']}, metrics_keys={list(metrics.keys()) if metrics else 'None'}")
+            
+            # Clean up file
+            Path(file_path_str).unlink(missing_ok=True)
+            
+            return jsonify(response_data)
+            
+        except Exception as eval_error:
+            # Clean up file on error
+            Path(file_path_str).unlink(missing_ok=True)
+            raise eval_error
         
     except Exception as e:
         import traceback
@@ -850,38 +612,6 @@ def compare_hierarchy():
         print(error_msg)
         print(traceback.format_exc())
         return jsonify({'error': error_msg, 'details': traceback.format_exc()}), 500
-
-
-@app.route('/api/hierarchy-progress/<job_id>')
-def get_hierarchy_progress(job_id):
-    """Get progress for hierarchy evaluation job."""
-    try:
-        with progress_lock:
-            if job_id not in hierarchy_progress_store:
-                # Return 200 with error message instead of 404 to allow retry logic
-                # This can happen if polling starts before job is initialized (should be rare now)
-                print(f"[PROGRESS] Job {job_id} not found in store (may still be initializing)")
-                return jsonify({
-                    'error': 'Job not found',
-                    'progress': 0,
-                    'status': 'Job not found - may still be initializing',
-                    'complete': False
-                }), 200
-            
-            progress_data = hierarchy_progress_store[job_id].copy()
-            # Include results if complete (already in copy, but ensure it's properly included)
-            return jsonify(progress_data)
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"[PROGRESS] Error fetching progress for job {job_id}: {e}")
-        print(f"[PROGRESS] Traceback: {error_details}")
-        return jsonify({
-            'error': str(e),
-            'progress': 0,
-            'status': f'Error: {str(e)}',
-            'complete': False
-        }), 500
 
 
 @app.route('/api/test')

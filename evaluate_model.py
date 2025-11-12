@@ -24,11 +24,10 @@ class CodebookEvaluator:
         Args:
             benchmark_path: Path to ground truth XML
             model_output_path: Path to model-generated XML
-            progress_callback: Optional function(progress: float, status: str) to report progress
+            progress_callback: Deprecated - no longer used (kept for backward compatibility)
         """
         self.benchmark_path = benchmark_path
         self.model_output_path = model_output_path
-        self.progress_callback = progress_callback
         
         # Data structures
         self.codebook = {}  # CBCKey -> code details (from benchmark)
@@ -38,15 +37,6 @@ class CodebookEvaluator:
         
         # Metrics storage
         self.metrics = {}
-    
-    def _update_progress(self, progress: float, status: str):
-        """Update progress if callback is provided. Lightweight - no heavy operations."""
-        if self.progress_callback:
-            try:
-                self.progress_callback(progress, status)
-            except Exception:
-                # Silently fail to avoid slowing down evaluation
-                pass
         
     def parse_xml(self, xml_path: str) -> Tuple[Dict, Dict]:
         """
@@ -340,15 +330,11 @@ class CodebookEvaluator:
         print("LOADING DATA")
         print("="*70)
         
-        self._update_progress(5, "Parsing benchmark XML file...")
         # Load benchmark (ground truth)
         self.codebook, self.benchmark_responses = self.parse_xml(self.benchmark_path)
-        
-        self._update_progress(25, "Parsing model output XML file...")
         # Load model output
         model_codebook, self.model_responses = self.parse_xml(self.model_output_path)
         
-        self._update_progress(40, "Validating codebook structure...")
         # Check if comparing same file - use identity mapping for efficiency
         from pathlib import Path
         same_file = Path(self.benchmark_path).resolve() == Path(self.model_output_path).resolve()
@@ -356,7 +342,6 @@ class CodebookEvaluator:
         # Validate codebook structure first (before mapping)
         self._validate_codebook(self.codebook, model_codebook)
         
-        self._update_progress(50, "Building code mapping...")
         # Build simple ID-based mapping (one-to-one by code ID)
         self.model_to_benchmark_code_map = self._build_code_mapping(self.codebook, model_codebook)
         
@@ -408,7 +393,6 @@ class CodebookEvaluator:
             print(f"⚠️  WARNING: {len(extra_in_model)} responses in model output but not in benchmark")
         
         # Update progress after alignment setup
-        self._update_progress(65, f"Aligning {len(common_keys)} responses...")
         
         # Align common responses and map model codes to benchmark codes
         same_file = Path(self.benchmark_path).resolve() == Path(self.model_output_path).resolve()
@@ -456,7 +440,6 @@ class CodebookEvaluator:
                 print(f"      Missing: {gt - pred}, Extra: {pred - gt}")
         
         print(f"\n✓ Aligned {len(aligned)} responses for evaluation")
-        self._update_progress(70, f"Aligned {len(aligned)} responses")
         return aligned
     
     def calculate_metrics(self, aligned_data: List[Tuple[str, Set[str], Set[str]]]):
@@ -465,7 +448,6 @@ class CodebookEvaluator:
         print("CALCULATING METRICS")
         print("="*70)
         
-        self._update_progress(75, f"Calculating metrics for {len(aligned_data)} responses...")
         
         # Initialize counters
         total_tp = 0  # True Positives (across all responses)
@@ -752,7 +734,6 @@ class CodebookEvaluator:
         # Sort mismatches by error count (worst first)
         mismatches.sort(key=lambda x: x['error_count'], reverse=True)
         
-        self._update_progress(90, "Finalizing metrics...")
         
         # Store metrics
         self.metrics = {
